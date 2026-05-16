@@ -1,0 +1,1 @@
+/usr/bin/c++ -O3 -DNDEBUG -flto=auto -Wl,--dependency-file=CMakeFiles/bench_pipeline.dir/link.d CMakeFiles/bench_pipeline.dir/bench/bench_pipeline.cpp.o -o bench_pipeline  libiicpc_core.a libiicpc_loadgen.a libiicpc_telemetry.a libiicpc_core.a -lpthread

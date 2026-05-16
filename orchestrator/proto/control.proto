@@ -1,0 +1,188 @@
+syntax = "proto3";
+
+package iicpc;
+
+option cc_enable_arenas = true;
+
+// =============================================================================
+// Benchmark Orchestrator Service
+// =============================================================================
+// Control plane for managing distributed benchmark workers, contestant
+// sandboxes, and real-time metrics aggregation.
+// =============================================================================
+
+service BenchmarkOrchestrator {
+    // Worker lifecycle
+    rpc RegisterWorker(WorkerInfo) returns (RegistrationAck);
+    rpc Heartbeat(HeartbeatRequest) returns (HeartbeatResponse);
+
+    // Benchmark lifecycle
+    rpc StartBenchmark(BenchmarkConfig) returns (BenchmarkHandle);
+    rpc StopBenchmark(BenchmarkHandle) returns (BenchmarkResult);
+    rpc GetBenchmarkStatus(BenchmarkHandle) returns (BenchmarkStatus);
+
+    // Metrics streaming (server-side stream)
+    rpc StreamMetrics(BenchmarkHandle) returns (stream MetricsSnapshot);
+
+    // Leaderboard
+    rpc GetLeaderboard(LeaderboardRequest) returns (Leaderboard);
+}
+
+// =============================================================================
+// Worker Messages
+// =============================================================================
+
+message WorkerInfo {
+    string worker_id = 1;
+    string hostname = 2;
+    uint32 num_cores = 3;
+    uint64 memory_bytes = 4;
+    bool has_hugepages = 5;
+    bool has_kvm = 6;
+    repeated uint32 isolated_cores = 7;
+}
+
+message RegistrationAck {
+    bool accepted = 1;
+    string assigned_id = 2;
+    string error_message = 3;
+}
+
+message HeartbeatRequest {
+    string worker_id = 1;
+    uint64 timestamp_ns = 2;
+    float cpu_usage = 3;
+    uint64 memory_used_bytes = 4;
+    uint32 active_sandboxes = 5;
+}
+
+message HeartbeatResponse {
+    bool ok = 1;
+}
+
+// =============================================================================
+// Benchmark Messages
+// =============================================================================
+
+message BenchmarkConfig {
+    string benchmark_id = 1;
+    string contestant_id = 2;
+
+    // Engine configuration
+    uint32 num_bots = 3;
+    uint32 duration_secs = 4;
+    uint32 target_tps = 5;
+
+    // Transport selection
+    enum Transport {
+        TCP = 0;
+        UNIX_SOCKET = 1;
+        SHARED_MEMORY = 2;
+    }
+    Transport transport = 6;
+
+    // Sandbox configuration
+    SandboxConfig sandbox = 7;
+
+    // Contestant binary
+    string binary_path = 8;
+    repeated string binary_args = 9;
+}
+
+message SandboxConfig {
+    uint64 memory_limit_bytes = 1;   // Default: 256 MiB
+    uint32 cpu_quota_ms = 2;         // CPU time per period (default: 100)
+    uint32 cpu_period_ms = 3;        // Period (default: 100)
+    uint32 max_pids = 4;             // Default: 64
+    repeated uint32 pinned_cores = 5;
+    uint32 vcpu_count = 6;           // Firecracker vCPUs (default: 2)
+
+    // Firecracker-specific
+    string kernel_image_path = 7;
+    string rootfs_path = 8;
+}
+
+message BenchmarkHandle {
+    string benchmark_id = 1;
+    string worker_id = 2;
+}
+
+message BenchmarkStatus {
+    enum State {
+        UNKNOWN = 0;
+        PENDING = 1;
+        RUNNING = 2;
+        COMPLETED = 3;
+        FAILED = 4;
+        TIMEOUT = 5;
+    }
+    State state = 1;
+    string benchmark_id = 2;
+    double elapsed_secs = 3;
+    uint64 total_tps = 4;
+    string error_message = 5;
+}
+
+message BenchmarkResult {
+    string benchmark_id = 1;
+    string contestant_id = 2;
+    double elapsed_secs = 3;
+
+    // Performance metrics
+    uint64 total_sends = 4;
+    uint64 total_recvs = 5;
+    uint64 drops = 6;
+    double achieved_tps = 7;
+
+    // Latency percentiles (nanoseconds)
+    LatencyProfile latency = 8;
+
+    // Scoring
+    double score = 9;
+    string error_message = 10;
+}
+
+message LatencyProfile {
+    uint64 min_ns = 1;
+    uint64 p50_ns = 2;
+    uint64 p90_ns = 3;
+    uint64 p99_ns = 4;
+    uint64 p999_ns = 5;
+    uint64 max_ns = 6;
+    uint64 total_samples = 7;
+}
+
+// =============================================================================
+// Metrics Streaming
+// =============================================================================
+
+message MetricsSnapshot {
+    string benchmark_id = 1;
+    uint64 timestamp_ns = 2;
+    double tps = 3;
+    uint64 total_samples = 4;
+    uint64 dropped = 5;
+    LatencyProfile latency = 6;
+}
+
+// =============================================================================
+// Leaderboard
+// =============================================================================
+
+message LeaderboardRequest {
+    uint32 top_n = 1;   // Return top N entries (0 = all)
+    string benchmark_id = 2;
+}
+
+message Leaderboard {
+    repeated LeaderboardEntry entries = 1;
+}
+
+message LeaderboardEntry {
+    uint32 rank = 1;
+    string contestant_id = 2;
+    double score = 3;
+    double achieved_tps = 4;
+    LatencyProfile latency = 5;
+    uint64 drops = 6;
+}

@@ -1,0 +1,39 @@
+# =============================================================================
+# Dockerfile.engine — IICPC Benchmark Engine
+# =============================================================================
+# Multi-stage build: compile with GCC 15 → minimal runtime image
+# =============================================================================
+
+# Stage 1: Build
+FROM gentoo/stage3:latest AS builder
+
+# Install build dependencies
+RUN emerge --sync && emerge --quiet \
+    sys-devel/gcc \
+    dev-build/cmake \
+    dev-build/ninja
+
+WORKDIR /src
+COPY . .
+
+RUN mkdir -p build && cd build && \
+    cmake .. \
+      -DCMAKE_BUILD_TYPE=Release \
+      -DIICPC_USE_URING=OFF \
+      -G Ninja && \
+    ninja bench_ultra bench_pipeline bench_shm validate_checkpoint1 dummy_exchange
+
+# Stage 2: Minimal runtime
+FROM gentoo/stage3:latest AS runtime
+
+COPY --from=builder /src/build/bench_ultra /usr/local/bin/
+COPY --from=builder /src/build/bench_pipeline /usr/local/bin/
+COPY --from=builder /src/build/bench_shm /usr/local/bin/
+COPY --from=builder /src/build/validate_checkpoint1 /usr/local/bin/
+COPY --from=builder /src/build/dummy_exchange /usr/local/bin/
+
+# Required for hugepages
+RUN mkdir -p /dev/hugepages
+
+ENTRYPOINT ["bench_ultra"]
+CMD ["--duration", "10", "--bots", "100", "--unix"]

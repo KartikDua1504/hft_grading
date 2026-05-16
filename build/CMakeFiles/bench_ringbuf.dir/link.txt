@@ -1,0 +1,1 @@
+/usr/bin/c++ -O3 -DNDEBUG -flto=auto -Wl,--dependency-file=CMakeFiles/bench_ringbuf.dir/link.d CMakeFiles/bench_ringbuf.dir/bench/bench_ringbuf.cpp.o -o bench_ringbuf  libiicpc_core.a -lpthread

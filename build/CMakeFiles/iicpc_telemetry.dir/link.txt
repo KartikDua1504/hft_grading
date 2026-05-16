@@ -1,0 +1,2 @@
+/usr/bin/ar qc libiicpc_telemetry.a CMakeFiles/iicpc_telemetry.dir/telemetry/src/consumer.cpp.o
+/usr/bin/ranlib libiicpc_telemetry.a

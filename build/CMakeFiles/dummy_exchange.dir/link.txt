@@ -1,0 +1,1 @@
+/usr/bin/c++ -O3 -DNDEBUG -flto=auto -Wl,--dependency-file=CMakeFiles/dummy_exchange.dir/link.d CMakeFiles/dummy_exchange.dir/server/src/dummy_exchange.cpp.o -o dummy_exchange  libiicpc_core.a libiicpc_loadgen.a libiicpc_core.a -lpthread

@@ -1,0 +1,162 @@
+# =============================================================================
+# docker-compose.yml — IICPC Full Infrastructure Stack
+# =============================================================================
+# Services:
+#   - redpanda:       Kafka-compatible streaming (metrics pipeline)
+#   - questdb:        Time-series DB (latency persistence)
+#   - redis:          Leaderboard + caching + job queue
+#   - api:            FastAPI backend (auth, submit, leaderboard, WebSocket)
+#   - frontend:       SvelteKit dev server
+# =============================================================================
+
+services:
+  # ===========================================================================
+  # Redpanda — Kafka-compatible event streaming
+  # ===========================================================================
+  redpanda:
+    image: docker.redpanda.com/redpandadata/redpanda:v24.3.7
+    container_name: iicpc-redpanda
+    command:
+      - redpanda
+      - start
+      - --smp=1
+      - --memory=512M
+      - --reserve-memory=0M
+      - --overprovisioned
+      - --node-id=0
+      - --kafka-addr=internal://0.0.0.0:9092,external://0.0.0.0:19092
+      - --advertise-kafka-addr=internal://redpanda:9092,external://localhost:19092
+      - --pandaproxy-addr=internal://0.0.0.0:8082,external://0.0.0.0:18082
+      - --advertise-pandaproxy-addr=internal://redpanda:8082,external://localhost:18082
+      - --schema-registry-addr=internal://0.0.0.0:8081,external://0.0.0.0:18081
+      - --rpc-addr=redpanda:33145
+      - --advertise-rpc-addr=redpanda:33145
+      - --mode=dev-container
+    ports:
+      - "19092:19092"
+      - "18082:18082"
+      - "18081:18081"
+      - "9644:9644"
+    volumes:
+      - redpanda-data:/var/lib/redpanda/data
+    networks:
+      - iicpc-net
+    healthcheck:
+      test: ["CMD", "rpk", "cluster", "health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ===========================================================================
+  # Redpanda Console — Web UI for topic management
+  # ===========================================================================
+  redpanda-console:
+    image: docker.redpanda.com/redpandadata/console:v2.8.2
+    container_name: iicpc-console
+    depends_on:
+      redpanda:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    environment:
+      KAFKA_BROKERS: "redpanda:9092"
+      REDPANDA_ADMINAPI_URLS: "http://redpanda:9644"
+    networks:
+      - iicpc-net
+
+  # ===========================================================================
+  # QuestDB — Time-Series Database (ILP ingestion for C++ metrics)
+  # ===========================================================================
+  questdb:
+    image: questdb/questdb:8.3.1
+    container_name: iicpc-questdb
+    ports:
+      - "9000:9000"     # Web Console + REST API
+      - "9009:9009"     # ILP (InfluxDB Line Protocol) ingestion
+      - "8812:8812"     # PostgreSQL wire protocol
+    volumes:
+      - questdb-data:/var/lib/questdb
+    environment:
+      QDB_LOG_W_STDOUT_LEVEL: ERROR
+      QDB_PG_ENABLED: "true"
+      QDB_LINE_TCP_ENABLED: "true"
+    networks:
+      - iicpc-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/status"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ===========================================================================
+  # Redis — Leaderboard + Session Cache + Job Queue
+  # ===========================================================================
+  redis:
+    image: redis:7-alpine
+    container_name: iicpc-redis
+    ports:
+      - "6379:6379"
+    command: >
+      redis-server
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
+      --appendonly yes
+      --save 60 100
+    volumes:
+      - redis-data:/data
+    networks:
+      - iicpc-net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # ===========================================================================
+  # FastAPI Backend — Competition API Server
+  # ===========================================================================
+  api:
+    build:
+      context: ../../
+      dockerfile: infra/docker/Dockerfile.api
+    container_name: iicpc-api
+    depends_on:
+      redis:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+    environment:
+      REDIS_URL: "redis://redis:6379"
+      JWT_SECRET: "${JWT_SECRET:-iicpc-production-secret-$(openssl rand -hex 16)}"
+      UPLOAD_DIR: "/data/uploads"
+      RESULTS_DIR: "/data/results"
+    volumes:
+      - upload-data:/data/uploads
+      - results-data:/data/results
+      - ../../scripts:/app/scripts:ro
+      - ../../build:/app/build:ro
+    networks:
+      - iicpc-net
+    restart: unless-stopped
+
+# =============================================================================
+# Volumes — persistent storage
+# =============================================================================
+volumes:
+  redpanda-data:
+    driver: local
+  questdb-data:
+    driver: local
+  redis-data:
+    driver: local
+  upload-data:
+    driver: local
+  results-data:
+    driver: local
+
+# =============================================================================
+# Networks
+# =============================================================================
+networks:
+  iicpc-net:
+    driver: bridge

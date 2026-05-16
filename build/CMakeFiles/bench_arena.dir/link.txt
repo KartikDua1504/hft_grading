@@ -1,0 +1,1 @@
+/usr/bin/c++ -O3 -DNDEBUG -flto=auto -Wl,--dependency-file=CMakeFiles/bench_arena.dir/link.d CMakeFiles/bench_arena.dir/bench/bench_arena.cpp.o -o bench_arena  libiicpc_core.a -lpthread

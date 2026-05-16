@@ -1,0 +1,1 @@
+/usr/bin/c++ -O3 -DNDEBUG -Wl,--dependency-file=CMakeFiles/sample_orderbook.dir/link.d CMakeFiles/sample_orderbook.dir/tests/sample_orderbook.cpp.o -o sample_orderbook

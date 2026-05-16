@@ -1,0 +1,2 @@
+/usr/bin/ar qc libiicpc_core.a CMakeFiles/iicpc_core.dir/core/src/arena.cpp.o CMakeFiles/iicpc_core.dir/core/src/hdr_histogram.cpp.o
+/usr/bin/ranlib libiicpc_core.a

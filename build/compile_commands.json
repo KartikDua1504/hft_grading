@@ -1,0 +1,152 @@
+[
+{
+  "directory": "/home/junior/Desktop/Coding/IICPC/build",
+  "command": "/usr/bin/c++ -DIICPC_HAS_URING=0 -I/home/junior/Desktop/Coding/IICPC/core/include -O3 -DNDEBUG -std=c++23 -fPIC -march=native -mtune=native -Wall -Wextra -Wpedantic -Wconversion -Wshadow -Wdouble-promotion -fno-omit-frame-pointer -O3 -flto=auto -fno-exceptions -fno-rtti -fstrict-aliasing -ffast-math -funroll-loops -fprefetch-loop-arrays -ftree-vectorize -fopt-info-vec-optimized -o CMakeFiles/iicpc_core.dir/core/src/arena.cpp.o -c /home/junior/Desktop/Coding/IICPC/core/src/arena.cpp",
+  "file": "/home/junior/Desktop/Coding/IICPC/core/src/arena.cpp",
+  "output": "CMakeFiles/iicpc_core.dir/core/src/arena.cpp.o"
+},
+{
+  "directory": "/home/junior/Desktop/Coding/IICPC/build",
+  "command": "/usr/bin/c++ -DIICPC_HAS_URING=0 -I/home/junior/Desktop/Coding/IICPC/core/include -O3 -DNDEBUG -std=c++23 -fPIC -march=native -mtune=native -Wall -Wextra -Wpedantic -Wconversion -Wshadow -Wdouble-promotion -fno-omit-frame-pointer -O3 -flto=auto -fno-exceptions -fno-rtti -fstrict-aliasing -ffast-math -funroll-loops -fprefetch-loop-arrays -ftree-vectorize -fopt-info-vec-optimized -o CMakeFiles/iicpc_core.dir/core/src/hdr_histogram.cpp.o -c /home/junior/Desktop/Coding/IICPC/core/src/hdr_histogram.cpp",
+  "file": "/home/junior/Desktop/Coding/IICPC/core/src/hdr_histogram.cpp",
+  "output": "CMakeFiles/iicpc_core.dir/core/src/hdr_histogram.cpp.o"
+},
+{
+  "directory": "/home/junior/Desktop/Coding/IICPC/build",
+  "command": "/usr/bin/c++ -DIICPC_HAS_URING=0 -I/home/junior/Desktop/Coding/IICPC/loadgen/include -I/home/junior/Desktop/Coding/IICPC/core/include -O3 -DNDEBUG -std=c++23 -fPIC -march=native -mtune=native -Wall -Wextra -Wpedantic -Wconversion -Wshadow -Wdouble-promotion -fno-omit-frame-pointer -O3 -flto=auto -fno-exceptions -fno-rtti -fstrict-aliasing -ffast-math -funroll-loops -fprefetch-loop-arrays -ftree-vectorize -fopt-info-vec-optimized -o CMakeFiles/iicpc_loadgen.dir/loadgen/src/bot_fleet.cpp.o -c /home/junior/Desktop/Coding/IICPC/loadgen/src/bot_fleet.cpp",
+  "file": "/home/junior/Desktop/Coding/IICPC/loadgen/src/bot_fleet.cpp",
+  "output": "CMakeFiles/iicpc_loadgen.dir/loadgen/src/bot_fleet.cpp.o"
+},
+{
+  "directory": "/home/junior/Desktop/Coding/IICPC/build",
+  "command": "/usr/bin/c++ -DIICPC_HAS_URING=0 -I/home/junior/Desktop/Coding/IICPC/loadgen/include -I/home/junior/Desktop/Coding/IICPC/core/include -O3 -DNDEBUG -std=c++23 -fPIC -march=native -mtune=native -Wall -Wextra -Wpedantic -Wconversion -Wshadow -Wdouble-promotion -fno-omit-frame-pointer -O3 -flto=auto -fno-exceptions -fno-rtti -fstrict-aliasing -ffast-math -funroll-loops -fprefetch-loop-arrays -ftree-vectorize -fopt-info-vec-optimized -o CMakeFiles/iicpc_loadgen.dir/loadgen/src/payload_gen.cpp.o -c /home/junior/Desktop/Coding/IICPC/loadgen/src/payload_gen.cpp",
+  "file": "/home/junior/Desktop/Coding/IICPC/loadgen/src/payload_gen.cpp",
+  "output": "CMakeFiles/iicpc_loadgen.dir/loadgen/src/payload_gen.cpp.o"
+},
+{
+  "directory": "/home/junior/Desktop/Coding/IICPC/build",
+  "command": "/usr/bin/c++ -DIICPC_HAS_URING=0 -I/home/junior/Desktop/Coding/IICPC/loadgen/include -I/home/junior/Desktop/Coding/IICPC/core/include -O3 -DNDEBUG -std=c++23 -fPIC -march=native -mtune=native -Wall -Wextra -Wpedantic -Wconversion -Wshadow -Wdouble-promotion -fno-omit-frame-pointer -O3 -flto=auto -fno-exceptions -fno-rtti -fstrict-aliasing -ffast-math -funroll-loops -fprefetch-loop-arrays -ftree-vectorize -fopt-info-vec-optimized -o CMakeFiles/iicpc_loadgen.dir/loadgen/src/io_engine.cpp.o -c /home/junior/Desktop/Coding/IICPC/loadgen/src/io_engine.cpp",
+  "file": "/home/junior/Desktop/Coding/IICPC/loadgen/src/io_engine.cpp",
+  "output": "CMakeFiles/iicpc_loadgen.dir/loadgen/src/io_engine.cpp.o"
+},
+{
+  "directory": "/home/junior/Desktop/Coding/IICPC/build",
+  "command": "/usr/bin/c++ -DIICPC_HAS_URING=0 -I/home/junior/Desktop/Coding/IICPC/telemetry/include -I/home/junior/Desktop/Coding/IICPC/core/include -O3 -DNDEBUG -std=c++23 -fPIC -march=native -mtune=native -Wall -Wextra -Wpedantic -Wconversion -Wshadow -Wdouble-promotion -fno-omit-frame-pointer -O3 -flto=auto -fno-exceptions -fno-rtti -fstrict-aliasing -ffast-math -funroll-loops -fprefetch-loop-arrays -ftree-vectorize -fopt-info-vec-optimized -o CMakeFiles/iicpc_telemetry.dir/telemetry/src/consumer.cpp.o -c /home/junior/Desktop/Coding/IICPC/telemetry/src/consumer.cpp",
+  "file": "/home/junior/Desktop/Coding/IICPC/telemetry/src/consumer.cpp",
+  "output": "CMakeFiles/iicpc_telemetry.dir/telemetry/src/consumer.cpp.o"
+},
+{
+  "directory": "/home/junior/Desktop/Coding/IICPC/build",
+  "command": "/usr/bin/c++ -DIICPC_HAS_URING=0 -I/home/junior/Desktop/Coding/IICPC/core/include -I/home/junior/Desktop/Coding/IICPC/loadgen/include -O3 -DNDEBUG -std=c++23 -fPIE -march=native -mtune=native -Wall -Wextra -Wpedantic -Wconversion -Wshadow -Wdouble-promotion -fno-omit-frame-pointer -O3 -flto=auto -fno-exceptions -fno-rtti -fstrict-aliasing -ffast-math -funroll-loops -fprefetch-loop-arrays -ftree-vectorize -fopt-info-vec-optimized -o CMakeFiles/dummy_exchange.dir/server/src/dummy_exchange.cpp.o -c /home/junior/Desktop/Coding/IICPC/server/src/dummy_exchange.cpp",
+  "file": "/home/junior/Desktop/Coding/IICPC/server/src/dummy_exchange.cpp",
+  "output": "CMakeFiles/dummy_exchange.dir/server/src/dummy_exchange.cpp.o"
+},
+{
+  "directory": "/home/junior/Desktop/Coding/IICPC/build",
+  "command": "/usr/bin/c++ -DIICPC_HAS_URING=0 -I/home/junior/Desktop/Coding/IICPC/core/include -I/home/junior/Desktop/Coding/IICPC/loadgen/include -I/home/junior/Desktop/Coding/IICPC/telemetry/include -O3 -DNDEBUG -std=c++23 -fPIE -march=native -mtune=native -Wall -Wextra -Wpedantic -Wconversion -Wshadow -Wdouble-promotion -fno-omit-frame-pointer -O3 -flto=auto -fno-exceptions -fno-rtti -fstrict-aliasing -ffast-math -funroll-loops -fprefetch-loop-arrays -ftree-vectorize -fopt-info-vec-optimized -g1 -o CMakeFiles/validate_checkpoint1.dir/bench/validate_checkpoint1.cpp.o -c /home/junior/Desktop/Coding/IICPC/bench/validate_checkpoint1.cpp",
+  "file": "/home/junior/Desktop/Coding/IICPC/bench/validate_checkpoint1.cpp",
+  "output": "CMakeFiles/validate_checkpoint1.dir/bench/validate_checkpoint1.cpp.o"
+},
+{
+  "directory": "/home/junior/Desktop/Coding/IICPC/build",
+  "command": "/usr/bin/c++ -DIICPC_HAS_URING=0 -I/home/junior/Desktop/Coding/IICPC/core/include -O3 -DNDEBUG -std=c++23 -fPIE -march=native -mtune=native -Wall -Wextra -Wpedantic -Wconversion -Wshadow -Wdouble-promotion -fno-omit-frame-pointer -O3 -flto=auto -fno-exceptions -fno-rtti -fstrict-aliasing -ffast-math -funroll-loops -fprefetch-loop-arrays -ftree-vectorize -fopt-info-vec-optimized -g1 -o CMakeFiles/bench_arena.dir/bench/bench_arena.cpp.o -c /home/junior/Desktop/Coding/IICPC/bench/bench_arena.cpp",
+  "file": "/home/junior/Desktop/Coding/IICPC/bench/bench_arena.cpp",
+  "output": "CMakeFiles/bench_arena.dir/bench/bench_arena.cpp.o"
+},
+{
+  "directory": "/home/junior/Desktop/Coding/IICPC/build",
+  "command": "/usr/bin/c++ -DIICPC_HAS_URING=0 -I/home/junior/Desktop/Coding/IICPC/core/include -O3 -DNDEBUG -std=c++23 -fPIE -march=native -mtune=native -Wall -Wextra -Wpedantic -Wconversion -Wshadow -Wdouble-promotion -fno-omit-frame-pointer -O3 -flto=auto -fno-exceptions -fno-rtti -fstrict-aliasing -ffast-math -funroll-loops -fprefetch-loop-arrays -ftree-vectorize -fopt-info-vec-optimized -g1 -o CMakeFiles/bench_ringbuf.dir/bench/bench_ringbuf.cpp.o -c /home/junior/Desktop/Coding/IICPC/bench/bench_ringbuf.cpp",
+  "file": "/home/junior/Desktop/Coding/IICPC/bench/bench_ringbuf.cpp",
+  "output": "CMakeFiles/bench_ringbuf.dir/bench/bench_ringbuf.cpp.o"
+},
+{
+  "directory": "/home/junior/Desktop/Coding/IICPC/build",
+  "command": "/usr/bin/c++ -DIICPC_HAS_URING=0 -I/home/junior/Desktop/Coding/IICPC/core/include -I/home/junior/Desktop/Coding/IICPC/loadgen/include -I/home/junior/Desktop/Coding/IICPC/telemetry/include -O3 -DNDEBUG -std=c++23 -fPIE -march=native -mtune=native -Wall -Wextra -Wpedantic -Wconversion -Wshadow -Wdouble-promotion -fno-omit-frame-pointer -O3 -flto=auto -fno-exceptions -fno-rtti -fstrict-aliasing -ffast-math -funroll-loops -fprefetch-loop-arrays -ftree-vectorize -fopt-info-vec-optimized -g1 -o CMakeFiles/bench_ultra.dir/bench/bench_ultra.cpp.o -c /home/junior/Desktop/Coding/IICPC/bench/bench_ultra.cpp",
+  "file": "/home/junior/Desktop/Coding/IICPC/bench/bench_ultra.cpp",
+  "output": "CMakeFiles/bench_ultra.dir/bench/bench_ultra.cpp.o"
+},
+{
+  "directory": "/home/junior/Desktop/Coding/IICPC/build",
+  "command": "/usr/bin/c++ -DIICPC_HAS_URING=0 -I/home/junior/Desktop/Coding/IICPC/core/include -I/home/junior/Desktop/Coding/IICPC/loadgen/include -I/home/junior/Desktop/Coding/IICPC/telemetry/include -O3 -DNDEBUG -std=c++23 -fPIE -march=native -mtune=native -Wall -Wextra -Wpedantic -Wconversion -Wshadow -Wdouble-promotion -fno-omit-frame-pointer -O3 -flto=auto -fno-exceptions -fno-rtti -fstrict-aliasing -ffast-math -funroll-loops -fprefetch-loop-arrays -ftree-vectorize -fopt-info-vec-optimized -g1 -o CMakeFiles/bench_pipeline.dir/bench/bench_pipeline.cpp.o -c /home/junior/Desktop/Coding/IICPC/bench/bench_pipeline.cpp",
+  "file": "/home/junior/Desktop/Coding/IICPC/bench/bench_pipeline.cpp",
+  "output": "CMakeFiles/bench_pipeline.dir/bench/bench_pipeline.cpp.o"
+},
+{
+  "directory": "/home/junior/Desktop/Coding/IICPC/build",
+  "command": "/usr/bin/c++ -DIICPC_HAS_URING=0 -I/home/junior/Desktop/Coding/IICPC/core/include -I/home/junior/Desktop/Coding/IICPC/loadgen/include -I/home/junior/Desktop/Coding/IICPC/telemetry/include -O3 -DNDEBUG -std=c++23 -fPIE -march=native -mtune=native -Wall -Wextra -Wpedantic -Wconversion -Wshadow -Wdouble-promotion -fno-omit-frame-pointer -O3 -flto=auto -fno-exceptions -fno-rtti -fstrict-aliasing -ffast-math -funroll-loops -fprefetch-loop-arrays -ftree-vectorize -fopt-info-vec-optimized -g1 -o CMakeFiles/bench_shm.dir/bench/bench_shm.cpp.o -c /home/junior/Desktop/Coding/IICPC/bench/bench_shm.cpp",
+  "file": "/home/junior/Desktop/Coding/IICPC/bench/bench_shm.cpp",
+  "output": "CMakeFiles/bench_shm.dir/bench/bench_shm.cpp.o"
+},
+{
+  "directory": "/home/junior/Desktop/Coding/IICPC/build",
+  "command": "/usr/bin/c++ -DIICPC_HAS_URING=0 -I/home/junior/Desktop/Coding/IICPC/sdk/include -I/home/junior/Desktop/Coding/IICPC/core/include -I/home/junior/Desktop/Coding/IICPC/loadgen/include -O3 -DNDEBUG -std=c++23 -fPIE -march=native -mtune=native -Wall -Wextra -Wpedantic -Wconversion -Wshadow -Wdouble-promotion -fno-omit-frame-pointer -O3 -flto=auto -fno-exceptions -fno-rtti -fstrict-aliasing -ffast-math -funroll-loops -fprefetch-loop-arrays -ftree-vectorize -fopt-info-vec-optimized -g1 -o CMakeFiles/bench_blaster.dir/bench/bench_blaster.cpp.o -c /home/junior/Desktop/Coding/IICPC/bench/bench_blaster.cpp",
+  "file": "/home/junior/Desktop/Coding/IICPC/bench/bench_blaster.cpp",
+  "output": "CMakeFiles/bench_blaster.dir/bench/bench_blaster.cpp.o"
+},
+{
+  "directory": "/home/junior/Desktop/Coding/IICPC/build",
+  "command": "/usr/bin/c++ -DIICPC_HAS_URING=0 -I/home/junior/Desktop/Coding/IICPC/build/proto_gen -O3 -DNDEBUG -std=c++23 -fPIC -w -o CMakeFiles/iicpc_proto.dir/proto_gen/control.pb.cc.o -c /home/junior/Desktop/Coding/IICPC/build/proto_gen/control.pb.cc",
+  "file": "/home/junior/Desktop/Coding/IICPC/build/proto_gen/control.pb.cc",
+  "output": "CMakeFiles/iicpc_proto.dir/proto_gen/control.pb.cc.o"
+},
+{
+  "directory": "/home/junior/Desktop/Coding/IICPC/build",
+  "command": "/usr/bin/c++ -DIICPC_HAS_URING=0 -I/home/junior/Desktop/Coding/IICPC/build/proto_gen -O3 -DNDEBUG -std=c++23 -fPIC -w -o CMakeFiles/iicpc_proto.dir/proto_gen/control.grpc.pb.cc.o -c /home/junior/Desktop/Coding/IICPC/build/proto_gen/control.grpc.pb.cc",
+  "file": "/home/junior/Desktop/Coding/IICPC/build/proto_gen/control.grpc.pb.cc",
+  "output": "CMakeFiles/iicpc_proto.dir/proto_gen/control.grpc.pb.cc.o"
+},
+{
+  "directory": "/home/junior/Desktop/Coding/IICPC/build",
+  "command": "/usr/bin/c++ -DIICPC_HAS_URING=0 -I/home/junior/Desktop/Coding/IICPC/build/proto_gen -I/home/junior/Desktop/Coding/IICPC/sandbox/include -O3 -DNDEBUG -std=c++23 -fPIE -o CMakeFiles/orchestrator_server.dir/orchestrator/src/orchestrator_server.cpp.o -c /home/junior/Desktop/Coding/IICPC/orchestrator/src/orchestrator_server.cpp",
+  "file": "/home/junior/Desktop/Coding/IICPC/orchestrator/src/orchestrator_server.cpp",
+  "output": "CMakeFiles/orchestrator_server.dir/orchestrator/src/orchestrator_server.cpp.o"
+},
+{
+  "directory": "/home/junior/Desktop/Coding/IICPC/build",
+  "command": "/usr/bin/c++ -DIICPC_HAS_URING=0 -I/home/junior/Desktop/Coding/IICPC/build/proto_gen -I/home/junior/Desktop/Coding/IICPC/core/include -I/home/junior/Desktop/Coding/IICPC/loadgen/include -I/home/junior/Desktop/Coding/IICPC/telemetry/include -I/home/junior/Desktop/Coding/IICPC/sandbox/include -O3 -DNDEBUG -std=c++23 -fPIE -o CMakeFiles/worker_agent.dir/orchestrator/src/worker_agent.cpp.o -c /home/junior/Desktop/Coding/IICPC/orchestrator/src/worker_agent.cpp",
+  "file": "/home/junior/Desktop/Coding/IICPC/orchestrator/src/worker_agent.cpp",
+  "output": "CMakeFiles/worker_agent.dir/orchestrator/src/worker_agent.cpp.o"
+},
+{
+  "directory": "/home/junior/Desktop/Coding/IICPC/build",
+  "command": "/usr/bin/c++ -DIICPC_HAS_URING=0 -I/home/junior/Desktop/Coding/IICPC/pipeline/include -I/home/junior/Desktop/Coding/IICPC/core/include -I/home/junior/Desktop/Coding/IICPC/loadgen/include -I/home/junior/Desktop/Coding/IICPC/telemetry/include -O3 -DNDEBUG -std=c++23 -fPIE -o CMakeFiles/pipeline_e2e.dir/pipeline/src/pipeline_e2e.cpp.o -c /home/junior/Desktop/Coding/IICPC/pipeline/src/pipeline_e2e.cpp",
+  "file": "/home/junior/Desktop/Coding/IICPC/pipeline/src/pipeline_e2e.cpp",
+  "output": "CMakeFiles/pipeline_e2e.dir/pipeline/src/pipeline_e2e.cpp.o"
+},
+{
+  "directory": "/home/junior/Desktop/Coding/IICPC/build",
+  "command": "/usr/bin/c++ -DIICPC_HAS_URING=0 -I/home/junior/Desktop/Coding/IICPC/pipeline/include -I/home/junior/Desktop/Coding/IICPC/build/proto_gen -I/home/junior/Desktop/Coding/IICPC/core/include -I/home/junior/Desktop/Coding/IICPC/loadgen/include -I/home/junior/Desktop/Coding/IICPC/telemetry/include -I/home/junior/Desktop/Coding/IICPC/sandbox/include -O3 -DNDEBUG -std=c++23 -fPIE -o CMakeFiles/integrated_worker.dir/orchestrator/src/integrated_worker.cpp.o -c /home/junior/Desktop/Coding/IICPC/orchestrator/src/integrated_worker.cpp",
+  "file": "/home/junior/Desktop/Coding/IICPC/orchestrator/src/integrated_worker.cpp",
+  "output": "CMakeFiles/integrated_worker.dir/orchestrator/src/integrated_worker.cpp.o"
+},
+{
+  "directory": "/home/junior/Desktop/Coding/IICPC/build",
+  "command": "/usr/bin/c++ -DIICPC_HAS_URING=0 -I/home/junior/Desktop/Coding/IICPC/exchange/include -I/home/junior/Desktop/Coding/IICPC/sdk/include -I/home/junior/Desktop/Coding/IICPC/core/include -O3 -DNDEBUG -std=c++23 -fPIE -o CMakeFiles/exchange_local.dir/exchange/src/exchange_local.cpp.o -c /home/junior/Desktop/Coding/IICPC/exchange/src/exchange_local.cpp",
+  "file": "/home/junior/Desktop/Coding/IICPC/exchange/src/exchange_local.cpp",
+  "output": "CMakeFiles/exchange_local.dir/exchange/src/exchange_local.cpp.o"
+},
+{
+  "directory": "/home/junior/Desktop/Coding/IICPC/build",
+  "command": "/usr/bin/c++ -DIICPC_HAS_URING=0 -I/home/junior/Desktop/Coding/IICPC/sdk/include -O3 -DNDEBUG -std=c++23 -fPIE -o CMakeFiles/example_mm.dir/sdk/examples/example_mm.cpp.o -c /home/junior/Desktop/Coding/IICPC/sdk/examples/example_mm.cpp",
+  "file": "/home/junior/Desktop/Coding/IICPC/sdk/examples/example_mm.cpp",
+  "output": "CMakeFiles/example_mm.dir/sdk/examples/example_mm.cpp.o"
+},
+{
+  "directory": "/home/junior/Desktop/Coding/IICPC/build",
+  "command": "/usr/bin/c++ -DIICPC_HAS_URING=0 -I/home/junior/Desktop/Coding/IICPC/sdk/include -O3 -DNDEBUG -std=c++23 -fPIE -o CMakeFiles/example_mm.dir/sdk/src/strategy_main.cpp.o -c /home/junior/Desktop/Coding/IICPC/sdk/src/strategy_main.cpp",
+  "file": "/home/junior/Desktop/Coding/IICPC/sdk/src/strategy_main.cpp",
+  "output": "CMakeFiles/example_mm.dir/sdk/src/strategy_main.cpp.o"
+},
+{
+  "directory": "/home/junior/Desktop/Coding/IICPC/build",
+  "command": "/usr/bin/c++ -DIICPC_HAS_URING=0 -I/home/junior/Desktop/Coding/IICPC/orchestrator/include -I/home/junior/Desktop/Coding/IICPC/exchange/include -I/home/junior/Desktop/Coding/IICPC/sandbox/include -I/home/junior/Desktop/Coding/IICPC/loadgen/include -I/home/junior/Desktop/Coding/IICPC/sdk/include -I/home/junior/Desktop/Coding/IICPC/core/include -O3 -DNDEBUG -std=c++23 -fPIE -o CMakeFiles/run_contest.dir/orchestrator/src/run_contest.cpp.o -c /home/junior/Desktop/Coding/IICPC/orchestrator/src/run_contest.cpp",
+  "file": "/home/junior/Desktop/Coding/IICPC/orchestrator/src/run_contest.cpp",
+  "output": "CMakeFiles/run_contest.dir/orchestrator/src/run_contest.cpp.o"
+},
+{
+  "directory": "/home/junior/Desktop/Coding/IICPC/build",
+  "command": "/usr/bin/c++ -DIICPC_HAS_URING=0 -I/home/junior/Desktop/Coding/IICPC/sdk/include -O3 -DNDEBUG -std=c++23 -fPIE -o CMakeFiles/sample_orderbook.dir/tests/sample_orderbook.cpp.o -c /home/junior/Desktop/Coding/IICPC/tests/sample_orderbook.cpp",
+  "file": "/home/junior/Desktop/Coding/IICPC/tests/sample_orderbook.cpp",
+  "output": "CMakeFiles/sample_orderbook.dir/tests/sample_orderbook.cpp.o"
+}
+]
