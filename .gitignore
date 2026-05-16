@@ -1,0 +1,2 @@
+infra/firecracker/contestant_rootfs.ext4
+infra/firecracker/snapshots/snapshot_mem
