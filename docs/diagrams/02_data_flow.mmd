@@ -1,0 +1,38 @@
+sequenceDiagram
+    participant U as User Browser
+    participant A as FastAPI
+    participant R as Redis Queue
+    participant W as Worker
+    participant C as Compiler
+    participant F as Firecracker VM
+    participant E as Exchange Engine
+    participant S as Shadow Orderbook
+    participant T as Telemetry
+    participant L as Leaderboard
+
+    U->>A: POST /api/submit (orderbook.cpp)
+    A->>A: JWT verify + rate limit
+    A->>R: LPUSH submission_queue
+    A->>U: {job_id, status: queued}
+
+    W->>R: BRPOP submission_queue
+    W->>C: g++ -O3 -static -march=x86-64-v3
+    C-->>W: contestant binary
+
+    W->>F: Boot MicroVM (snapshot resume <5ms)
+    W->>F: Inject binary into rootfs
+    F->>F: Execute contestant binary
+
+    loop 10M+ Orders
+        E->>F: MarketUpdate (64B POD)
+        F->>E: OrderEntry (64B POD)
+        E->>S: Same order stream
+        E->>F: Fill/Ack (32-64B)
+        E->>T: LatencySample via SPSC ring
+    end
+
+    S->>S: Validate fills vs reference
+    T->>T: HDR Histogram percentiles
+    W->>R: ZADD leaderboard score
+    W->>L: WebSocket broadcast
+    L->>U: Live score update

@@ -34,10 +34,12 @@ bool HugePageArena::init(std::size_t size) noexcept {
     size = align_up(size, HUGE_PAGE_SIZE);
     
     // Attempt 1: 2MB huge pages (preferred)
+    // MAP_POPULATE pre-faults all pages at startup, avoiding multi-µs page
+    // fault latency spikes when the hot path touches a new 2MB boundary.
     void* ptr = ::mmap(
         nullptr, size,
         PROT_READ | PROT_WRITE,
-        MAP_PRIVATE | MAP_ANONYMOUS | MAP_HUGETLB | MAP_HUGE_2MB,
+        MAP_PRIVATE | MAP_ANONYMOUS | MAP_HUGETLB | MAP_HUGE_2MB | MAP_POPULATE,
         -1, 0
     );
 

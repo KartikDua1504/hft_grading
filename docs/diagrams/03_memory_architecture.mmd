@@ -1,0 +1,24 @@
+graph LR
+    subgraph "HugePageArena (2MB pages)"
+        A1["Bump Allocator<br/>0.3ns/alloc"]
+        A2["64-byte aligned<br/>Cache-line aware"]
+        A3["Thread-local<br/>Zero contention"]
+    end
+
+    subgraph "SPSC Ring Buffer (1M slots)"
+        R1["write_pos<br/>(own cache line)"]
+        R2["64 bytes padding"]
+        R3["read_pos<br/>(own cache line)"]
+        R4["Data array<br/>LatencySample x 1M"]
+    end
+
+    subgraph "Order Pool (SoA Layout)"
+        O1["order_ids[]"]
+        O2["prices[]"]
+        O3["quantities[]"]
+        O4["sides[]"]
+        O5["active[]<br/>64 bools/cache line"]
+    end
+
+    A1 --> R1
+    A1 --> O1

@@ -1,0 +1,18 @@
+stateDiagram-v2
+    [*] --> S_IDLE
+
+    S_IDLE --> S_CHECK_MATCH: ORDER_ENTRY
+    S_IDLE --> S_CANCEL_LOOKUP: CANCEL_REQUEST
+
+    S_CHECK_MATCH --> S_EXECUTE_FILL: Price crosses
+    S_CHECK_MATCH --> S_INSERT_REST: No match (LIMIT)
+    S_CHECK_MATCH --> S_SEND_ACK: No match (IOC/MARKET)
+
+    S_EXECUTE_FILL --> S_CHECK_MATCH: Remaining qty > 0 (deep sweep)
+    S_EXECUTE_FILL --> S_SEND_ACK: Fully filled
+
+    S_INSERT_REST --> S_SEND_ACK: Resting order placed
+
+    S_CANCEL_LOOKUP --> S_IDLE: Ack sent (CANCELLED or REJECTED)
+
+    S_SEND_ACK --> S_IDLE: Done

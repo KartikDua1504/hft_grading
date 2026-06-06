@@ -55,6 +55,8 @@ struct WorkerConfig {
     uint16_t questdb_port = 9009;
     const char* redis_host = "127.0.0.1";
     uint16_t redis_port = 16379;
+    const char* redpanda_host = "127.0.0.1";
+    uint16_t redpanda_port = 19092;
 
     // Sandbox
     bool use_firecracker = false;
@@ -91,6 +93,10 @@ static WorkerConfig parse_args(int argc, char* argv[]) {
             cfg.redis_host = argv[++i];
         else if (std::strcmp(argv[i], "--redis-port") == 0 && i + 1 < argc)
             cfg.redis_port = static_cast<uint16_t>(std::atoi(argv[++i]));
+        else if (std::strcmp(argv[i], "--redpanda-host") == 0 && i + 1 < argc)
+            cfg.redpanda_host = argv[++i];
+        else if (std::strcmp(argv[i], "--redpanda-port") == 0 && i + 1 < argc)
+            cfg.redpanda_port = static_cast<uint16_t>(std::atoi(argv[++i]));
         else if (std::strcmp(argv[i], "--firecracker") == 0)
             cfg.use_firecracker = true;
         else if (std::strcmp(argv[i], "--kernel") == 0 && i + 1 < argc)
@@ -353,6 +359,9 @@ int main(int argc, char* argv[]) {
     RedisPublisher redis;
     bool redis_ok = redis.connect(cfg.redis_host, cfg.redis_port);
 
+    RedpandaPublisher redpanda;
+    bool redpanda_ok = redpanda.connect(cfg.redpanda_host, cfg.redpanda_port);
+
     // =========================================================================
     // 5. Run benchmark
     // =========================================================================
@@ -387,6 +396,14 @@ int main(int argc, char* argv[]) {
         redis.hset(key, "drops", val);
     }
 
+    // Final Redpanda publish (contest result → iicpc.results topic)
+    if (redpanda_ok) {
+        redpanda.publish_result(cfg.contestant_id, results.score,
+                               results.tps, results.p99_ns, results.drops);
+        std::fprintf(stderr, "[worker] Published result to Redpanda (%lu messages total)\n",
+                     redpanda.total_published());
+    }
+
     // =========================================================================
     // 7. Print results
     // =========================================================================
@@ -409,6 +426,8 @@ int main(int argc, char* argv[]) {
                  questdb_ok ? "✓" : "✗", questdb.total_published());
     std::fprintf(stderr, "║  [%s] Redis leaderboard                                    ║\n",
                  redis_ok ? "✓" : "✗");
+    std::fprintf(stderr, "║  [%s] Redpanda (%lu events)                                ║\n",
+                 redpanda_ok ? "✓" : "✗", redpanda.total_published());
     std::fprintf(stderr, "║  [%s] Firecracker sandbox                                  ║\n",
                  cfg.use_firecracker ? "✓" : "—");
     std::fprintf(stderr, "╚══════════════════════════════════════════════════════════════╝\n");

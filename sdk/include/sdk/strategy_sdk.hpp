@@ -1,50 +1,61 @@
 #pragma once
 // =============================================================================
-// strategy_sdk.hpp — Contestant Strategy Interface
+// strategy_sdk.hpp — Contestant Orderbook Engine Interface
 // =============================================================================
-// Contestants implement IStrategy. The platform calls on_market_data() on
-// every tick. Contestants submit orders via the Gateway reference passed
-// at init. PnL is tracked by the exchange — contestants see it in Fill msgs.
+// Contestants implement IStrategy to build their own matching engine.
+// The platform blasts orders at your engine and measures:
+//   - Correctness: do your fills match the reference shadow orderbook?
+//   - Throughput:  how many orders/sec can you process?
+//   - Latency:     how fast is your order-to-response time?
+//
+// You receive OrderEntry and CancelRequest messages, and must fill
+// ContestantResponse structs with your matching results.
 //
 // Rules:
-//   - on_market_data() must return quickly (<100µs ideally)
-//   - Blocking = missing ticks = losing money
+//   - on_order() and on_cancel() must return quickly (<1µs ideally)
+//   - Blocking = low throughput = low score
 //   - No heap allocation in the hot loop (use stack/arena)
 //   - Single instrument (instrument_id = 0)
 // =============================================================================
 
 #include "sdk/protocol.hpp"
 
+#include <cstdint>
+
 namespace iicpc {
 
 // =============================================================================
-// Order submission interface (provided by the platform)
+// Contestant's response (what you send back after processing an order)
 // =============================================================================
-class IOrderGateway {
+// The platform reads these to measure your correctness and latency.
+// You fill order_id, response_type, ack_status, fill fields, etc.
+// The recv_tsc/send_tsc fields are filled by the platform (ignore them).
+// =============================================================================
+struct alignas(64) ContestantResponse {
+    uint32_t order_id;         // Echo back the order's client_order_id
+    MsgType  response_type;    // ORDER_ACK or FILL
+    AckStatus ack_status;      // If ORDER_ACK: ACCEPTED, REJECTED_*, CANCELLED
+    uint8_t  _pad0;
+    uint8_t  num_fills;        // Number of fills this order generated
+    int64_t  fill_price;       // Fill price (if response_type == FILL)
+    int32_t  fill_qty;         // Fill quantity (if response_type == FILL)
+    int32_t  remaining_qty;    // Remaining on resting order
+    uint64_t recv_tsc;         // (platform use — do not set)
+    uint64_t send_tsc;         // (platform use — do not set)
+    uint8_t  _pad1[16];
+};
+static_assert(sizeof(ContestantResponse) == 64);
+
+// =============================================================================
+// Response sender — allows sending multiple responses per order
+// =============================================================================
+// For aggressive orders that match multiple resting levels, call
+// sender.send() once per fill, then once for the ack.
+// =============================================================================
+class IResponseSender {
 public:
-    virtual ~IOrderGateway() = default;
-
-    /// Submit a new order. Returns true if accepted for sending.
-    /// Does NOT mean the order was matched — wait for OrderAck/Fill.
-    [[nodiscard]] virtual bool send_order(const OrderEntry& order) noexcept = 0;
-
-    /// Submit a cancel request. Returns true if accepted for sending.
-    [[nodiscard]] virtual bool send_cancel(const CancelRequest& cancel) noexcept = 0;
-
-    /// Get current contestant position (updated after each fill)
-    [[nodiscard]] virtual int32_t position() const noexcept = 0;
-
-    /// Get current unrealized PnL (mark-to-market)
-    [[nodiscard]] virtual int64_t unrealized_pnl() const noexcept = 0;
-
-    /// Get current realized PnL (from closed trades)
-    [[nodiscard]] virtual int64_t realized_pnl() const noexcept = 0;
-
-    /// Get total PnL (realized + unrealized)
-    [[nodiscard]] virtual int64_t total_pnl() const noexcept = 0;
-
-    /// Generate a unique client order ID
-    [[nodiscard]] virtual uint32_t next_order_id() noexcept = 0;
+    virtual ~IResponseSender() = default;
+    virtual bool send(const ContestantResponse& resp) noexcept = 0;
 };
 
 // =============================================================================
@@ -54,42 +65,39 @@ class IStrategy {
 public:
     virtual ~IStrategy() = default;
 
-    /// Called once at session start. Store the gateway reference.
-    /// Use this to initialize your data structures.
-    virtual void on_session_start(IOrderGateway& gateway,
-                                   const SessionStart& session) noexcept = 0;
+    /// Called once at session start. Initialize your orderbook here.
+    virtual void on_session_start(const SessionStart& session) noexcept {}
 
-    /// Called on every market data tick. This is the HOT PATH.
-    /// Read the update, decide whether to trade, submit orders via gateway.
-    /// MUST return quickly — if you block, you miss ticks and lose money.
-    virtual void on_market_data(const MarketUpdate& update) noexcept = 0;
+    /// Called for every incoming order. THIS IS THE HOT PATH.
+    /// Process the order through your matching engine.
+    /// Use 'sender' to send one or more ContestantResponse:
+    ///   - For a resting order: send one ACK
+    ///   - For an aggressive order that fills: send FILL(s) then ACK
+    /// MUST return quickly — blocking = low throughput = low score.
+    virtual void on_order(const OrderEntry& order,
+                          IResponseSender& sender) noexcept = 0;
 
-    /// Called when your order is acknowledged (accepted/rejected).
-    virtual void on_order_ack(const OrderAck& ack) noexcept = 0;
-
-    /// Called when your order is filled (partially or fully).
-    /// PnL fields are updated by the platform.
-    virtual void on_fill(const Fill& fill) noexcept = 0;
-
-    /// Called when your cancel request is acknowledged.
-    virtual void on_cancel_ack(const CancelAck& ack) noexcept = 0;
+    /// Called for every cancel request.
+    /// Look up the order and cancel it. Send a CANCEL_ACK response.
+    virtual void on_cancel(const CancelRequest& cancel,
+                           IResponseSender& sender) noexcept = 0;
 
     /// Called once at session end. Print stats, cleanup, etc.
-    virtual void on_session_end(const SessionEnd& session) noexcept = 0;
+    virtual void on_session_end(const SessionEnd& session) noexcept {}
 };
 
 // =============================================================================
 // Strategy factory — contestants must implement this function
 // =============================================================================
-// The platform calls create_strategy() to instantiate the contestant's strategy.
+// The platform calls create_strategy() to instantiate the contestant's engine.
 // Contestants define this in their source file:
 //
 //   iicpc::IStrategy* iicpc::create_strategy() {
-//       static MyStrategy instance;
+//       static MyOrderbook instance;
 //       return &instance;
 //   }
 //
-// Using static instance avoids heap allocation. The strategy lives for the
+// Using static instance avoids heap allocation. The engine lives for the
 // entire session duration.
 // =============================================================================
 extern IStrategy* create_strategy();

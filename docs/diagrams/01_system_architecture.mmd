@@ -1,0 +1,52 @@
+graph TB
+    subgraph "AWS Cloud VPC"
+        subgraph "AWS c8i.metal-48xl (Host & Platform)"
+            subgraph "Cores 0-3: Platform Services"
+                NGINX["NGINX Reverse Proxy"]
+                API["FastAPI Backend<br/>Auth + Submit + WS"]
+                REDIS["Redis<br/>Leaderboard + Queue"]
+                QUEST["QuestDB<br/>Time-Series Telemetry"]
+                REDPANDA["Redpanda<br/>Event Streaming"]
+            end
+
+            subgraph "Cores 4-7: Load Generation"
+                BLASTER["Order Blaster<br/>10M OPS Deterministic"]
+                FLEET["Bot Fleet<br/>1000+ Simulated Traders"]
+                LOADGEN["Pipeline Engine<br/>writev scatter-gather"]
+            end
+
+            subgraph "Cores 8-11: Contestant Isolation"
+                FC["Firecracker MicroVM<br/>Separate Kernel"]
+                CONTESTANT["Contestant Code<br/>orderbook.cpp"]
+                GW["Gateway<br/>Unix Domain Socket"]
+            end
+
+            subgraph "Cores 12-15: Validation"
+                SHADOW["Shadow Orderbook<br/>Reference Engine"]
+                CORRECT["Correctness Validator<br/>8 Invariant Checks"]
+                TELEM["HDR Histogram<br/>p50/p90/p99/p999"]
+            end
+        end
+
+        subgraph "AWS f2.2xlarge (FPGA Instance)"
+            subgraph "FPGA (AWS F2) — Optional Accelerator"
+                FPGA_SEQ["HW Sequencer<br/>&lt;10ns Round-Robin"]
+                FPGA_ME["HW Match Engine<br/>~24ns/order @ 250MHz"]
+            end
+        end
+    end
+
+    USER["Web Browser"] --> NGINX --> API
+    API --> REDIS
+    BLASTER --> FLEET --> LOADGEN
+    LOADGEN --> GW --> FC --> CONTESTANT
+    CONTESTANT --> GW --> SHADOW
+    SHADOW --> CORRECT
+    CORRECT --> REDPANDA
+    LOADGEN --> TELEM
+    TELEM --> QUEST
+    TELEM --> REDIS
+    REDPANDA --> API
+    CORRECT --> REDIS
+    FPGA_SEQ -.->|"Network / PCIe-over-IP"| LOADGEN
+    FPGA_ME -.->|"Network / PCIe-over-IP"| SHADOW

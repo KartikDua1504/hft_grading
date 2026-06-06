@@ -1,0 +1,22 @@
+graph TB
+    subgraph "Docker Compose Stack"
+        REDIS["Redis 7 Alpine<br/>Port 6379<br/>Leaderboard + Queue"]
+        QUESTDB["QuestDB 8.3<br/>Port 9000/9009<br/>Time-Series DB"]
+        REDPANDA["Redpanda v24.3<br/>Port 19092<br/>Event Streaming"]
+        CONSOLE["Redpanda Console<br/>Port 8080<br/>Topic Management"]
+        FASTAPI["FastAPI Server<br/>Port 8000<br/>Auth + Submit + WS"]
+    end
+
+    subgraph "Terraform (AWS)"
+        VPC["VPC + Subnets"]
+        SG["Security Groups"]
+        METAL["c8i.metal-48xl<br/>48 cores bare metal"]
+        F2["f2.2xlarge<br/>FPGA Instance"]
+    end
+
+    FASTAPI --> REDIS
+    FASTAPI --> QUESTDB
+    FASTAPI --> REDPANDA
+    REDPANDA --> CONSOLE
+    VPC --> SG --> METAL
+    VPC --> SG --> F2

@@ -72,21 +72,39 @@ private:
     static CompileResult compile_host(const CompileConfig& cfg) noexcept {
         CompileResult result{};
 
-        // Build command
-        char cmd[2048];
+        // Build command — include strategy_main.cpp for the entry point
+        // strategy_main.cpp is at sdk/src/ (sibling of sdk/include/)
+        char strategy_main[1024] = {};
+        if (cfg.sdk_include) {
+            // sdk_include = ".../sdk/include" → strategy_main = ".../sdk/src/strategy_main.cpp"
+            std::snprintf(strategy_main, sizeof(strategy_main),
+                         "%s/../src/strategy_main.cpp", cfg.sdk_include);
+        }
+
+        char cmd[4096];
         int n = std::snprintf(cmd, sizeof(cmd),
-            "timeout %d g++ -std=c++20 -O2 -march=x86-64-v3 "
-            "-static -Wall -Werror "
+            "timeout %d g++ -std=c++23 -O2 -march=native "
+            "-Wall "
             "-o '%s' '%s'",
             cfg.timeout_secs, cfg.output_path, cfg.source_path);
 
+        // Add strategy_main.cpp if it exists
+        if (strategy_main[0] != '\0') {
+            n += std::snprintf(cmd + n, sizeof(cmd) - static_cast<std::size_t>(n),
+                             " '%s'", strategy_main);
+        }
+
         if (cfg.sdk_include) {
-            std::snprintf(cmd + n, sizeof(cmd) - static_cast<std::size_t>(n),
+            n += std::snprintf(cmd + n, sizeof(cmd) - static_cast<std::size_t>(n),
                          " -I'%s'", cfg.sdk_include);
         }
 
+        // Add pthread for threading support
+        std::snprintf(cmd + n, sizeof(cmd) - static_cast<std::size_t>(n),
+                     " -lpthread");
+
         // Capture stderr
-        char err_cmd[2200];
+        char err_cmd[4200];
         std::snprintf(err_cmd, sizeof(err_cmd), "%s 2>&1", cmd);
 
         FILE* pipe = ::popen(err_cmd, "r");

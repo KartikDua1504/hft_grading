@@ -1,0 +1,57 @@
+
+=== Step 1: Arena Allocator ===
+[arena] Allocated 512 MiB with 2MB huge pages at 0x7f513f400000
+[check] Arena alignment: PASS
+
+=== Step 2: TSC Calibration ===
+[tsc] Calibrated: 2.688 GHz (0.372 ns/tick, measured over 100 ms)
+
+=== Step 3: Ring Buffer ===
+[check] Ring buffer cache line separation: PASS
+
+=== Step 4: Starting Dummy Exchange ===
+[exchange] Listening on port 9999
+
+=== Step 5: Bot Fleet (100 bots) ===
+[payload_gen] Pre-generated 100 payloads (64 bytes each)
+
+=== Step 6: I/O Engine ===
+[io_engine] Connected 100 / 100 bots to 127.0.0.1:9999
+
+=== Step 7: Telemetry Consumer ===
+
+=== Step 8: BENCHMARK (5 seconds) ===
+[telemetry] Consumer started (report every 1000 ms)
+[telemetry] TPS=512436  total=512436  dropped=0  p50=162.8us  p90=189.4us  p99=307.2us  p999=442.4us  max=1021.6us
+[telemetry] TPS=512401  total=1024837  dropped=0  p50=161.8us  p90=189.4us  p99=337.9us  p999=383.0us  max=1021.6us
+[telemetry] TPS=518703  total=1543540  dropped=0  p50=163.8us  p90=189.4us  p99=305.2us  p999=374.8us  max=1021.6us
+[telemetry] TPS=518878  total=2062418  dropped=0  p50=163.8us  p90=189.4us  p99=299.0us  p999=366.6us  max=1021.6us
+
+=== Step 9: Shutdown ===
+[shutdown] Draining in-flight packets (1s)...
+[telemetry] TPS=511728  total=2574146  dropped=0  p50=161.8us  p90=189.4us  p99=331.8us  p999=366.6us  max=1021.6us
+
+[telemetry] === FINAL REPORT ===
+[telemetry] Total samples: 2574146
+[telemetry] Max seq seen: 2574145
+[telemetry] Computed drops: 0
+[hdr] samples=2574146  min=5.9us  p50=161.8us  p90=189.4us  p99=331.8us  p999=366.6us  max=1021.6us
+
+[exchange] Shutting down. Total messages processed: 2574146
+
+Elapsed: 5.00 seconds
+Total sends: 2574146
+Total recvs: 2574146
+Achieved TPS: 514828
+
+╔══════════════════════════════════════════════════════════╗
+║           CHECKPOINT 1 VALIDATION RESULTS               ║
+╠══════════════════════════════════════════════════════════╣
+║ [✓] Arena: 64-byte aligned allocations              ║
+║ [✓] Ring buffer: indices on separate cache lines     ║
+║ [✓] Load generator: ≥100,000 TPS (achieved: 514828)  ║
+║ [✓] Telemetry: zero dropped packets (0 dropped)   ║
+║ [✓] Telemetry: valid percentile output               ║
+╠══════════════════════════════════════════════════════════╣
+║                  OVERALL: ✅ PASS                          ║
+╚══════════════════════════════════════════════════════════╝

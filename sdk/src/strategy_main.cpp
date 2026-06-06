@@ -1,12 +1,12 @@
 // =============================================================================
-// strategy_main.cpp — main() wrapper for contestant strategies
+// strategy_main.cpp — main() wrapper for contestant orderbook engines
 // =============================================================================
 // Contestants link against this. It handles:
-//   1. Connect to gateway socket
-//   2. Instantiate contestant's strategy via create_strategy()
-//   3. Run the event loop until session ends
+//   1. Connect to platform gateway socket
+//   2. Instantiate contestant's engine via create_strategy()
+//   3. Run the event loop (receive orders, send responses)
 //
-// Compile: g++ -std=c++20 -O2 -static -o strategy contestant.cpp strategy_main.cpp
+// Compile: g++ -std=c++23 -O2 -o engine contestant.cpp strategy_main.cpp
 // =============================================================================
 
 #include "sdk/gateway_client.hpp"
@@ -26,7 +26,7 @@ int main(int argc, char* argv[]) {
     ::signal(SIGPIPE, SIG_IGN);
 
     // Default gateway socket path
-    const char* socket_path = "/tmp/iicpc_gateway.sock";
+    const char* socket_path = "/tmp/iicpc_contest.sock";
 
     for (int i = 1; i < argc; ++i) {
         if (std::strcmp(argv[i], "--gateway") == 0 && i + 1 < argc) {
@@ -34,29 +34,26 @@ int main(int argc, char* argv[]) {
         }
     }
 
-    std::fprintf(stderr, "[strategy] Connecting to gateway: %s\n", socket_path);
+    std::fprintf(stderr, "[engine] Connecting to platform: %s\n", socket_path);
 
-    // Create contestant strategy
-    iicpc::IStrategy* strategy = iicpc::create_strategy();
-    if (!strategy) {
-        std::fprintf(stderr, "[strategy] FATAL: create_strategy() returned null\n");
+    // Create contestant engine
+    iicpc::IStrategy* engine = iicpc::create_strategy();
+    if (!engine) {
+        std::fprintf(stderr, "[engine] FATAL: create_strategy() returned null\n");
         return 1;
     }
 
-    // Connect to gateway
+    // Connect to platform
     iicpc::GatewayClient client;
     if (!client.connect(socket_path)) {
-        std::fprintf(stderr, "[strategy] FATAL: could not connect to gateway\n");
+        std::fprintf(stderr, "[engine] FATAL: could not connect to platform\n");
         return 1;
     }
 
-    std::fprintf(stderr, "[strategy] Connected. Waiting for session start...\n");
+    std::fprintf(stderr, "[engine] Connected. Waiting for orders...\n");
 
     // Run event loop — returns when session ends or connection drops
-    client.run(*strategy);
-
-    std::fprintf(stderr, "[strategy] Session ended. PnL: %ld (realized: %ld)\n",
-                 client.total_pnl(), client.realized_pnl());
+    client.run(*engine);
 
     return 0;
 }

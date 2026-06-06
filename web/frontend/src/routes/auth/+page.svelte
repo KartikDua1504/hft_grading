@@ -66,13 +66,7 @@
 
       if (res.ok) {
         const data = await res.json();
-        login(data.token, teamName);
-        goto('/dashboard');
-        return;
-      }
-
-      if (res.status >= 500) {
-        login('demo-token', teamName || 'demo_team');
+        login(data.token, data.team_name);
         goto('/dashboard');
         return;
       }
@@ -80,8 +74,7 @@
       const data = await res.json().catch(() => ({}));
       error = data.detail || (mode === 'login' ? 'Invalid credentials.' : 'Registration failed.');
     } catch {
-      login('demo-token', teamName || 'demo_team');
-      goto('/dashboard');
+      error = 'Backend unreachable — is the server running? Use start.sh to launch everything.';
     } finally {
       loading = false;
     }
@@ -99,28 +92,18 @@
   <!-- Animated cosmic background -->
   <div class="absolute inset-0 bg-cosmic"></div>
 
-  <!-- Floating orbs that respond to mouse -->
-  <div class="absolute inset-0 pointer-events-none overflow-hidden">
-    <div
-      class="absolute w-[500px] h-[500px] rounded-full opacity-[0.04]"
-      style="
-        background: radial-gradient(circle, var(--accent), transparent 70%);
-        top: 20%; left: 30%;
-        transform: translate({mouseX * 0.5}px, {mouseY * 0.5}px);
-        transition: transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
-        filter: blur(60px);
-      "
-    ></div>
-    <div
-      class="absolute w-[400px] h-[400px] rounded-full opacity-[0.03]"
-      style="
-        background: radial-gradient(circle, var(--cyan), transparent 70%);
-        bottom: 20%; right: 20%;
-        transform: translate({mouseX * -0.3}px, {mouseY * -0.3}px);
-        transition: transform 1s cubic-bezier(0.16, 1, 0.3, 1);
-        filter: blur(80px);
-      "
-    ></div>
+  <!-- Background Matrix/Orderbook Stream -->
+  <div class="absolute inset-0 pointer-events-none overflow-hidden flex justify-center opacity-20" style="perspective: 800px;">
+    <div class="flex gap-4 transform rotate-x-12 translate-y-[-10%] scale-150 blur-[2px]">
+      {#each Array(40) as _, i}
+        <div class="flex flex-col gap-2 {i % 2 === 0 ? 'text-[var(--emerald)]' : 'text-[var(--rose)]'} mono text-[8px] opacity-70"
+             style="animation: slideDown {4 + Math.random() * 4}s linear infinite {Math.random()}s;">
+          {#each Array(30) as _, j}
+            <div>{(10000 + Math.random() * 500).toFixed(2)}</div>
+          {/each}
+        </div>
+      {/each}
+    </div>
   </div>
 
   <!-- Grid overlay -->
@@ -156,13 +139,13 @@
 
         <!-- Header -->
         <div class="text-center mb-8">
-          <h1 class="text-2xl font-bold display tracking-tight mb-2">
-            {mode === 'login' ? 'Welcome back' : 'Create your team'}
+          <h1 class="text-2xl font-bold display tracking-tight mb-2 glitch-hover">
+            {mode === 'login' ? 'System Initialization' : 'Establish Connection'}
           </h1>
-          <p class="text-sm text-[var(--text-secondary)]">
+          <p class="text-sm text-[var(--text-secondary)] mono">
             {mode === 'login'
-              ? 'Sign in to the arena. Your engine awaits.'
-              : 'Register your team and start competing.'}
+              ? 'Authenticate to deploy engine.'
+              : 'Register your algorithmic entity.'}
           </p>
         </div>
 
@@ -294,9 +277,13 @@
       </div>
 
       <!-- Bottom hint -->
-      <p class="text-center text-[10px] text-[var(--text-ghost)] mt-6 tracking-wider uppercase">
-        Secure • Isolated • Deterministic
-      </p>
+      <div class="mt-8 text-center text-[10px] text-[var(--text-ghost)] uppercase tracking-widest mono flex flex-col items-center gap-1">
+        <div>[ SECURE SESSION ESTABLISHED ]</div>
+        <div class="flex gap-2">
+          <span class="text-[var(--emerald)] flicker">●</span> <span class="opacity-50">ISOLATED ENCLAVE</span>
+          <span class="text-[var(--emerald)] flicker" style="animation-delay: 0.5s;">●</span> <span class="opacity-50">DETERMINISTIC CLOCK</span>
+        </div>
+      </div>
     </div>
   {/if}
 </div>

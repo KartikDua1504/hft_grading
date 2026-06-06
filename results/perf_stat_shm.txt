@@ -1,0 +1,91 @@
+
+╔══════════════════════════════════════════════════════════╗
+║   SHARED MEMORY BENCHMARK (ZERO SYSCALLS)               ║
+║   Pure lock-free IPC: loadgen ↔ exchange                ║
+║   Target: <1µs p50, maximum TPS                         ║
+╚══════════════════════════════════════════════════════════╝
+
+[arena] Allocated 1024 MiB with 2MB huge pages at 0x7fc535c00000
+[tsc] Calibrated: 2.688 GHz (0.372 ns/tick, measured over 100 ms)
+[bench] 100 bots, channel capacity 65536
+
+[bench] === SHM BENCHMARK START (3 seconds) ===
+
+[telemetry] Consumer started (report every 1000 ms)
+[telemetry] TPS=14989210  total=14989210  dropped=0  p50=3.9us  p90=5.0us  p99=6.6us  p999=10.3us  max=308.9us
+[telemetry] TPS=15802404  total=30791614  dropped=0  p50=3.8us  p90=4.9us  p99=6.3us  p999=9.3us  max=308.9us
+[telemetry] TPS=16796173  total=47587787  dropped=0  p50=3.6us  p90=4.7us  p99=6.1us  p999=10.5us  max=308.9us
+
+[telemetry] === FINAL REPORT ===
+[telemetry] Total samples: 47587787
+[telemetry] Max seq seen: 47587786
+[telemetry] Computed drops: 0
+[hdr] samples=47587787  min=0.7us  p50=3.6us  p90=4.7us  p99=6.1us  p999=10.5us  max=308.9us
+
+╔══════════════════════════════════════════════════════════════╗
+║            SHARED MEMORY BENCHMARK RESULTS                  ║
+╠══════════════════════════════════════════════════════════════╣
+║  Duration:     3.00 seconds                                ║
+║  Transport:    Shared Memory (zero syscalls)                 ║
+║  Bots:         100                                           ║
+║  Channel Cap:  65536                                         ║
+║                                                              ║
+║  Total Sends:  47587787                                      ║
+║  Total Recvs:  47587787                                      ║
+║  Drops:        0                                             ║
+║  TPS:          15862594                                      ║
+║                                                              ║
+║  Latency:                                                    ║
+║    min:         0.68 µs                                       ║
+║    p50:         3.65 µs                                       ║
+║    p90:         4.74 µs                                       ║
+║    p99:         6.08 µs                                       ║
+║    p999:       10.50 µs                                       ║
+║    max:       308.93 µs                                       ║
+║                                                              ║
+║  [✓] TPS ≥ 1M                                             ║
+║  [✓] TPS ≥ 5M                                             ║
+║  [✓] TPS ≥ 10M                                            ║
+║  [✓] Zero drops                                           ║
+║  [✗] p50 < 1µs (physics limit)                            ║
+║  [✓] p50 < 5µs (HFT-tier)                                ║
+║  [✓] p99 < 10µs (ultra-deterministic)                     ║
+║  [✓] p999 < 50µs                                          ║
+╚══════════════════════════════════════════════════════════════╝
+
+ Performance counter stats for './bench_shm --duration 3 --bots 100':
+
+         10,602.95 msec task-clock:u                     #    2.942 CPUs utilized             
+                 0      context-switches:u               #    0.000 /sec                      
+                 0      cpu-migrations:u                 #    0.000 /sec                      
+               167      page-faults:u                    #   15.750 /sec                      
+     6,310,468,265      cpu_atom/instructions/u          #    0.19  insn per cycle              (0.19%)
+    14,281,520,439      cpu_core/instructions/u          #    0.32  insn per cycle              (99.70%)
+    33,925,891,256      cpu_atom/cycles/u                #    3.200 GHz                         (0.21%)
+    44,799,292,256      cpu_core/cycles/u                #    4.225 GHz                         (99.70%)
+     1,021,132,436      cpu_atom/branches/u              #   96.306 M/sec                       (0.21%)
+     2,680,743,276      cpu_core/branches/u              #  252.830 M/sec                       (99.70%)
+         4,695,558      cpu_atom/branch-misses/u         #    0.46% of all branches             (0.23%)
+         6,647,163      cpu_core/branch-misses/u         #    0.25% of all branches             (99.70%)
+             TopdownL1 (cpu_core)                 #     82.5 %  tma_backend_bound      
+                                                  #      4.9 %  tma_bad_speculation    
+                                                  #      5.6 %  tma_frontend_bound     
+                                                  #      6.9 %  tma_retiring             (99.70%)
+                                                  #     15.2 %  tma_bad_speculation    
+                                                  #      6.6 %  tma_retiring             (0.23%)
+                                                  #     66.5 %  tma_backend_bound      
+                                                  #     11.7 %  tma_frontend_bound       (0.23%)
+     2,258,802,501      cpu_atom/L1-dcache-loads/u       #  213.035 M/sec                       (0.18%)
+     4,031,621,615      cpu_core/L1-dcache-loads/u       #  380.236 M/sec                       (99.70%)
+       185,041,527      cpu_core/L1-dcache-load-misses/u #    4.59% of all L1-dcache accesses   (99.70%)
+       180,449,607      cpu_atom/LLC-loads/u             #   17.019 M/sec                       (0.17%)
+       176,570,595      cpu_core/LLC-loads/u             #   16.653 M/sec                       (99.70%)
+             1,803      cpu_atom/LLC-load-misses/u       #    0.00% of all LL-cache accesses    (0.17%)
+            22,210      cpu_core/LLC-load-misses/u       #    0.01% of all LL-cache accesses    (99.70%)
+
+       3.604502129 seconds time elapsed
+
+      10.586623000 seconds user
+       0.003330000 seconds sys
+
+

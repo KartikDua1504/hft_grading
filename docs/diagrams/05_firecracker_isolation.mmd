@@ -1,0 +1,23 @@
+graph TB
+    subgraph "Host Kernel"
+        KVM["KVM Hypervisor"]
+        UDS["Unix Domain Socket"]
+        GATEWAY["Gateway Process<br/>CPU-pinned"]
+    end
+
+    subgraph "Firecracker MicroVM"
+        GUEST_K["Guest Kernel 5.10<br/>(minimal, no network)"]
+        INIT["Init Process"]
+        BIN["contestant binary<br/>(statically linked)"]
+        subgraph "Resource Limits"
+            CPU["2 vCPUs"]
+            MEM["256 MB RAM"]
+            DISK["Read-only rootfs"]
+            NET["No network"]
+        end
+    end
+
+    GATEWAY <-->|"64-byte POD messages"| UDS
+    UDS <--> KVM
+    KVM <--> GUEST_K
+    GUEST_K --> INIT --> BIN

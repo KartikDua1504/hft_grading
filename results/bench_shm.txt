@@ -1,0 +1,56 @@
+
+╔══════════════════════════════════════════════════════════╗
+║   SHARED MEMORY BENCHMARK (ZERO SYSCALLS)               ║
+║   Pure lock-free IPC: loadgen ↔ exchange                ║
+║   Target: <1µs p50, maximum TPS                         ║
+╚══════════════════════════════════════════════════════════╝
+
+[arena] Allocated 1024 MiB with 2MB huge pages at 0x7f28c8000000
+[tsc] Calibrated: 2.688 GHz (0.372 ns/tick, measured over 100 ms)
+[bench] 100 bots, channel capacity 65536
+
+[bench] === SHM BENCHMARK START (5 seconds) ===
+
+[telemetry] Consumer started (report every 1000 ms)
+[telemetry] TPS=14717735  total=14717735  dropped=0  p50=4.1us  p90=5.3us  p99=6.4us  p999=8.9us  max=352.9us
+[telemetry] TPS=15149042  total=29866777  dropped=0  p50=3.9us  p90=5.2us  p99=6.7us  p999=8.8us  max=352.9us
+[telemetry] TPS=15197863  total=45064640  dropped=0  p50=3.9us  p90=5.2us  p99=6.4us  p999=8.7us  max=352.9us
+[telemetry] TPS=16205138  total=61269778  dropped=0  p50=3.8us  p90=5.1us  p99=6.2us  p999=8.7us  max=352.9us
+[telemetry] TPS=16320734  total=77590512  dropped=0  p50=3.7us  p90=5.0us  p99=6.1us  p999=8.6us  max=352.9us
+
+[telemetry] === FINAL REPORT ===
+[telemetry] Total samples: 77590512
+[telemetry] Max seq seen: 77590511
+[telemetry] Computed drops: 0
+[hdr] samples=77590512  min=0.7us  p50=3.7us  p90=5.0us  p99=6.1us  p999=8.6us  max=352.9us
+
+╔══════════════════════════════════════════════════════════════╗
+║            SHARED MEMORY BENCHMARK RESULTS                  ║
+╠══════════════════════════════════════════════════════════════╣
+║  Duration:     5.00 seconds                                ║
+║  Transport:    Shared Memory (zero syscalls)                 ║
+║  Bots:         100                                           ║
+║  Channel Cap:  65536                                         ║
+║                                                              ║
+║  Total Sends:  77590512                                      ║
+║  Total Recvs:  77590512                                      ║
+║  Drops:        0                                             ║
+║  TPS:          15518100                                      ║
+║                                                              ║
+║  Latency:                                                    ║
+║    min:         0.66 µs                                       ║
+║    p50:         3.70 µs                                       ║
+║    p90:         4.96 µs                                       ║
+║    p99:         6.11 µs                                       ║
+║    p999:        8.64 µs                                       ║
+║    max:       352.88 µs                                       ║
+║                                                              ║
+║  [✓] TPS ≥ 1M                                             ║
+║  [✓] TPS ≥ 5M                                             ║
+║  [✓] TPS ≥ 10M                                            ║
+║  [✓] Zero drops                                           ║
+║  [✗] p50 < 1µs (physics limit)                            ║
+║  [✓] p50 < 5µs (HFT-tier)                                ║
+║  [✓] p99 < 10µs (ultra-deterministic)                     ║
+║  [✓] p999 < 50µs                                          ║
+╚══════════════════════════════════════════════════════════════╝

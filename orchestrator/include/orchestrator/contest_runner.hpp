@@ -23,6 +23,8 @@
 
 #include "loadgen/order_blaster.hpp"
 #include "exchange/shadow_orderbook.hpp"
+#include "exchange/stress_scenarios.hpp"
+#include "orchestrator/post_contest_validator.hpp"
 #include "sandbox/sandbox_bridge.hpp"
 #include "sandbox/compiler_service.hpp"
 #include "sandbox/firecracker_manager.hpp"
@@ -320,6 +322,21 @@ public:
         std::fprintf(stderr, "[runner] [4/6] Blasting orders for %us...\n",
                      cfg.duration_secs);
 
+        // Send SessionStart to contestant
+        {
+            SessionStart session_start{};
+            session_start.msg_type = MsgType::SESSION_START;
+            session_start.instrument_count = 1;
+            session_start.match_duration_ms = cfg.duration_secs * 1000;
+            session_start.start_timestamp_ns = 0;
+            session_start.initial_cash = 1000000000; // $100K scaled
+            session_start.max_position = 10000;
+            session_start.max_order_size = 1000;
+            session_start.max_orders_per_sec = cfg.orders_per_sec;
+            bridge.send_control(&session_start, sizeof(session_start));
+            std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        }
+
         const auto match_start = std::chrono::steady_clock::now();
         const auto match_end = match_start +
             std::chrono::seconds(cfg.duration_secs);
@@ -379,6 +396,29 @@ public:
         // 5. Stop + collect
         // =====================================================================
         std::fprintf(stderr, "[runner] [5/6] Stopping and collecting results...\n");
+
+        // Send SessionEnd to contestant
+        {
+            SessionEnd session_end{};
+            session_end.msg_type = MsgType::SESSION_END;
+            session_end.total_orders = static_cast<uint32_t>(bridge.stats().orders_sent);
+            bridge.send_control(&session_end, sizeof(session_end));
+        }
+
+        // Give contestant time to flush final responses
+        std::this_thread::sleep_for(std::chrono::milliseconds(200));
+
+        // Drain remaining responses
+        bridge.recv_responses();
+        ContestantResponse final_resp;
+        while (bridge.pop_response(final_resp)) {
+            if (final_resp.response_type == MsgType::FILL) {
+                shadow.validate_fill(final_resp.order_id, final_resp.fill_price,
+                                     final_resp.fill_qty);
+            } else if (final_resp.response_type == MsgType::ORDER_ACK) {
+                shadow.result_mut().total_acks++;
+            }
+        }
 
         bridge.shutdown();
         if (contestant_pid > 0) {
@@ -447,6 +487,38 @@ public:
 
         return result;
     }
+
+    // =========================================================================
+    // Run post-contest system tests against a pre-built binary
+    // =========================================================================
+    SystemTestResult run_system_tests(const MatchConfig& cfg,
+                                       double original_score) noexcept {
+        const char* binary_path = cfg.prebuilt_binary;
+        if (!binary_path) {
+            std::fprintf(stderr, "[runner] System test requires --binary\n");
+            SystemTestResult empty{};
+            return empty;
+        }
+
+        // Use a separate socket for system tests to avoid conflicts
+        const char* systest_socket = "/tmp/iicpc_systest.sock";
+
+        PostContestValidator validator;
+        SystemTestResult result = validator.run_system_tests(
+            cfg.contestant_id,
+            binary_path,
+            original_score,
+            systest_socket,
+            cfg.use_firecracker,
+            cfg.kernel_path,
+            cfg.rootfs_path);
+
+        // Print full report (admin-side, shows per-scenario breakdown)
+        result.print_report();
+
+        return result;
+    }
 };
 
 } // namespace iicpc
+

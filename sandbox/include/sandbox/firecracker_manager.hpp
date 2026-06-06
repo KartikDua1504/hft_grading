@@ -28,6 +28,34 @@
 namespace iicpc {
 
 // =============================================================================
+// JSON String Sanitizer — escapes special characters for safe interpolation
+// =============================================================================
+// Prevents malformed JSON from paths containing quotes, backslashes, or
+// control characters. Without this, a rootfs_path like:
+//   /tmp/contestant "evil"/rootfs.ext4
+// would break the JSON payload and cause Firecracker API rejection.
+// =============================================================================
+inline void json_escape(char* dst, size_t dst_size, const char* src) noexcept {
+    size_t j = 0;
+    for (size_t i = 0; src[i] != '\0' && j < dst_size - 2; ++i) {
+        char c = src[i];
+        if (c == '"' || c == '\\') {
+            dst[j++] = '\\';
+            if (j < dst_size - 1) dst[j++] = c;
+        } else if (c < 0x20) {
+            // Control characters → \uXXXX
+            if (j + 6 < dst_size) {
+                j += static_cast<size_t>(std::snprintf(dst + j, dst_size - j, "\\u%04x",
+                                                       static_cast<unsigned>(c)));
+            }
+        } else {
+            dst[j++] = c;
+        }
+    }
+    dst[j] = '\0';
+}
+
+// =============================================================================
 // MicroVM Configuration
 // =============================================================================
 struct MicroVMConfig {
@@ -159,18 +187,24 @@ public:
             return false;
         }
 
+        // Sanitize all paths for safe JSON interpolation
+        char safe_kernel[512], safe_rootfs[512], safe_bootargs[512];
+        json_escape(safe_kernel, sizeof(safe_kernel), config_.kernel_image_path);
+        json_escape(safe_rootfs, sizeof(safe_rootfs), config_.rootfs_path);
+        json_escape(safe_bootargs, sizeof(safe_bootargs), config_.boot_args);
+
         // Set boot source
         char boot_json[1024];
         std::snprintf(boot_json, sizeof(boot_json),
             R"({"kernel_image_path": "%s", "boot_args": "%s"})",
-            config_.kernel_image_path, config_.boot_args);
+            safe_kernel, safe_bootargs);
 
         if (!api_put("/boot-source", boot_json)) {
             set_error("Failed to set boot source");
             return false;
         }
 
-        // Set machine config (vCPUs, memory)
+        // Set machine config (vCPUs, memory) — no user strings, safe
         char machine_json[512];
         std::snprintf(machine_json, sizeof(machine_json),
             R"({"vcpu_count": %u, "mem_size_mib": %lu})",
@@ -185,7 +219,7 @@ public:
         char drive_json[1024];
         std::snprintf(drive_json, sizeof(drive_json),
             R"({"drive_id": "rootfs", "path_on_host": "%s", "is_root_device": true, "is_read_only": false})",
-            config_.rootfs_path);
+            safe_rootfs);
 
         if (!api_put("/drives/rootfs", drive_json)) {
             set_error("Failed to set rootfs drive");
@@ -194,10 +228,13 @@ public:
 
         // Optional: network interface
         if (config_.enable_network && config_.tap_device) {
+            char safe_mac[64], safe_tap[128];
+            json_escape(safe_mac, sizeof(safe_mac), config_.guest_mac);
+            json_escape(safe_tap, sizeof(safe_tap), config_.tap_device);
             char net_json[512];
             std::snprintf(net_json, sizeof(net_json),
                 R"({"iface_id": "eth0", "guest_mac": "%s", "host_dev_name": "%s"})",
-                config_.guest_mac, config_.tap_device);
+                safe_mac, safe_tap);
 
             if (!api_put("/network-interfaces/eth0", net_json)) {
                 std::fprintf(stderr, "[firecracker] WARNING: Failed to set network\n");

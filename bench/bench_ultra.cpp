@@ -2,7 +2,9 @@
 // bench_ultra.cpp — Ultra-Low-Latency Benchmark
 // =============================================================================
 // Single-binary benchmark: exchange, loadgen, and telemetry all in one process
-// with separate pinned threads. Uses Unix domain sockets to bypass TCP/IP.
+// with separate pinned threads. Uses Unix domain sockets to bypass the TCP/IP
+// stack (no checksumming, no Nagle, no congestion control). Note: UDS still
+// transits the kernel's VFS layer — true kernel bypass requires SHM or DPDK.
 //
 // This is the "squeeze everything" benchmark.
 // Target: <5µs p50, >1M TPS
@@ -21,6 +23,7 @@
 
 #include <atomic>
 #include <cerrno>
+#include <charconv>
 #include <chrono>
 #include <cstdio>
 #include <cstdlib>
@@ -50,13 +53,21 @@ struct BenchConfig {
     int telemetry_cpu = -1;     // Core for telemetry
 };
 
+// Safe integer parsing — std::atoi is UB on overflow and has zero error checking.
+// std::from_chars is zero-allocation, extremely fast, and bounds-safe.
+static int safe_parse_int(const char* str, int fallback = 0) {
+    int val = fallback;
+    auto [ptr, ec] = std::from_chars(str, str + std::strlen(str), val);
+    return (ec == std::errc{}) ? val : fallback;
+}
+
 static BenchConfig parse_args(int argc, char* argv[]) {
     BenchConfig cfg;
     for (int i = 1; i < argc; ++i) {
         if (std::strcmp(argv[i], "--duration") == 0 && i + 1 < argc)
-            cfg.duration_secs = std::atoi(argv[++i]);
+            cfg.duration_secs = safe_parse_int(argv[++i], cfg.duration_secs);
         else if (std::strcmp(argv[i], "--bots") == 0 && i + 1 < argc)
-            cfg.num_bots = static_cast<std::size_t>(std::atoi(argv[++i]));
+            cfg.num_bots = static_cast<std::size_t>(safe_parse_int(argv[++i], static_cast<int>(cfg.num_bots)));
         else if (std::strcmp(argv[i], "--tcp") == 0)
             { cfg.use_tcp = true; cfg.use_unix = false; }
         else if (std::strcmp(argv[i], "--unix") == 0)
@@ -64,11 +75,11 @@ static BenchConfig parse_args(int argc, char* argv[]) {
         else if (std::strcmp(argv[i], "--both") == 0)
             { cfg.use_unix = true; cfg.use_tcp = true; }
         else if (std::strcmp(argv[i], "--exchange-cpu") == 0 && i + 1 < argc)
-            cfg.exchange_cpu = std::atoi(argv[++i]);
+            cfg.exchange_cpu = safe_parse_int(argv[++i], cfg.exchange_cpu);
         else if (std::strcmp(argv[i], "--loadgen-cpu") == 0 && i + 1 < argc)
-            cfg.loadgen_cpu = std::atoi(argv[++i]);
+            cfg.loadgen_cpu = safe_parse_int(argv[++i], cfg.loadgen_cpu);
         else if (std::strcmp(argv[i], "--telemetry-cpu") == 0 && i + 1 < argc)
-            cfg.telemetry_cpu = std::atoi(argv[++i]);
+            cfg.telemetry_cpu = safe_parse_int(argv[++i], cfg.telemetry_cpu);
     }
     return cfg;
 }
@@ -105,8 +116,11 @@ int main(int argc, char* argv[]) {
     // Step 3: Start exchange thread
     // =========================================================================
     UltraExchange exchange;
-    std::atomic<bool> exchange_ready{false};
-    std::atomic<bool> exchange_stop{false};
+    // Pad cross-thread atomics to separate cache lines to prevent false sharing.
+    // Without padding, spinning on exchange_stop while another thread writes
+    // exchange_ready causes MESI cache line bouncing (~50ns per access).
+    alignas(64) std::atomic<bool> exchange_ready{false};
+    alignas(64) std::atomic<bool> exchange_stop{false};
 
     std::thread exchange_thread([&]() {
         if (cfg.exchange_cpu >= 0) {
@@ -162,7 +176,7 @@ int main(int argc, char* argv[]) {
 
     if (!engine.init(engine_config, fleet, arena)) {
         std::fprintf(stderr, "FATAL: Engine init failed\n");
-        exchange_stop.store(true);
+        exchange_stop.store(true, std::memory_order_release);
         exchange_thread.join();
         return 1;
     }
@@ -186,9 +200,6 @@ int main(int argc, char* argv[]) {
     std::fprintf(stderr, "\n[bench] === BENCHMARK START (%d seconds) ===\n\n",
                  cfg.duration_secs);
 
-    const auto start = std::chrono::steady_clock::now();
-    const auto deadline = start + std::chrono::seconds(cfg.duration_secs);
-
     // Pin loadgen thread if requested
     if (cfg.loadgen_cpu >= 0) {
         cpu_set_t cpuset;
@@ -198,15 +209,20 @@ int main(int argc, char* argv[]) {
         std::fprintf(stderr, "[bench] Loadgen pinned to CPU %d\n", cfg.loadgen_cpu);
     }
 
-    while (g_running && std::chrono::steady_clock::now() < deadline) {
+    // Calculate TSC deadline — avoid std::chrono::now() in the hot loop.
+    // __rdtsc() is a single hardware instruction (~1 cycle) vs clock_gettime
+    // (~20-30ns even via vDSO), and avoids I-cache pollution.
+    const uint64_t tsc_start = __rdtsc();
+    const uint64_t tsc_deadline = tsc_start +
+        static_cast<uint64_t>(cfg.duration_secs) * tsc_cal.tsc_hz;
+
+    while (g_running && __rdtsc() < tsc_deadline) {
         engine.run_batch(fleet, ring);
     }
 
-    // =========================================================================
-    // Step 8: Drain + Shutdown
-    // =========================================================================
-    const auto end = std::chrono::steady_clock::now();
-    const double elapsed_secs = std::chrono::duration<double>(end - start).count();
+    // Use TSC delta for precise elapsed time
+    const uint64_t tsc_end = __rdtsc();
+    const double elapsed_secs = static_cast<double>(tsc_end - tsc_start) * tsc_cal.tsc_to_ns / 1e9;
 
     std::fprintf(stderr, "\n[bench] Draining...\n");
     const auto drain_end = std::chrono::steady_clock::now() + std::chrono::seconds(1);
@@ -242,7 +258,7 @@ int main(int argc, char* argv[]) {
     std::fprintf(stderr, "╠══════════════════════════════════════════════════════════════╣\n");
     std::fprintf(stderr, "║  Duration:     %.2f seconds                                ║\n", elapsed_secs);
     std::fprintf(stderr, "║  Transport:    %-44s  ║\n",
-                 cfg.use_unix ? "Unix Domain Socket (kernel bypass)" : "TCP/IP");
+                 cfg.use_unix ? "Unix Domain Socket (bypasses TCP/IP stack)" : "TCP/IP");
     std::fprintf(stderr, "║  Bots:         %-44zu  ║\n", cfg.num_bots);
     std::fprintf(stderr, "║                                                              ║\n");
     std::fprintf(stderr, "║  Total Sends:  %-44lu  ║\n", total_sends);

@@ -70,6 +70,10 @@ static_assert(alignof(PaddedAtomic<uint64_t>) == CACHE_LINE_SIZE,
 
 template<typename T>
 struct alignas(CACHE_LINE_SIZE) CacheAligned {
+    static_assert(sizeof(T) < CACHE_LINE_SIZE,
+        "CacheAligned<T>: sizeof(T) must be strictly less than CACHE_LINE_SIZE (64). "
+        "Types that already fill a cache line don't need CacheAligned — use alignas(64) directly.");
+
     T value{};
     char _pad[CACHE_LINE_SIZE - sizeof(T)];
 };

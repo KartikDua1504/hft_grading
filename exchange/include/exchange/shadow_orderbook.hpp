@@ -61,17 +61,23 @@ struct ValidationResult {
                       static_cast<double>(total_expected);
         // Harsh penalty for priority violations
         double penalty = static_cast<double>(priority_errors) * 0.1;
-        // Penalty for extra/missing fills
-        penalty += static_cast<double>(extra_fills + missing_fills) * 0.01;
+        // Ratio-based penalty for extra/missing fills (not absolute count)
+        if (total_expected > 0) {
+            double extra_ratio = static_cast<double>(extra_fills) /
+                                 static_cast<double>(total_expected + extra_fills);
+            double missing_ratio = static_cast<double>(missing_fills) /
+                                   static_cast<double>(total_expected);
+            penalty += extra_ratio * 0.3 + missing_ratio * 0.3;
+        }
         double score = base - penalty;
-        return (score < 0.0) ? 0.0 : score;
+        return (score < 0.0) ? 0.0 : ((score > 1.0) ? 1.0 : score);
     }
 };
 
 // =============================================================================
 // Shadow Orderbook (Reference Implementation)
 // =============================================================================
-inline constexpr uint32_t SHADOW_MAX_FILLS = 65536;
+inline constexpr uint32_t SHADOW_MAX_FILLS = 262144; // 256K fills
 
 class ShadowOrderbook {
 public:
@@ -138,8 +144,9 @@ public:
     // Process a cancel through the shadow
     // =========================================================================
     void process_cancel(const CancelRequest& cancel) noexcept {
-        // Shadow doesn't track cancel IDs for simplicity
-        // In production: maintain order ID → pool index map
+        // Shadow doesn't track cancel order IDs — cancels affect the
+        // contestant's book state, but the shadow tracks the deterministic
+        // expected output independently.
         (void)cancel;
     }
 

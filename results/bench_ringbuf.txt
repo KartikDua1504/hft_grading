@@ -1,0 +1,11 @@
+=== SPSC Ring Buffer Benchmark ===
+
+[tsc] Calibrated: 2.688 GHz (0.372 ns/tick, measured over 100 ms)
+[test] Cache line separation: PASS
+[test] write_pos addr: 0x7fd44a725040 (offset: 0)
+[test] read_pos addr:  0x7fd44a725080 (offset: 64)
+[test] Single-threaded push+pop: 1.2 ns/op (822.3M ops/sec)
+[test] Two-threaded SPSC: 10000000 ops in 95.6 ms (104.6M ops/sec)
+[test] All messages received: PASS (10000000 / 10000000)
+
+=== Ring Buffer Benchmark Complete ===

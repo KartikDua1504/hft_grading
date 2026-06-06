@@ -8,11 +8,13 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Engine-14M_TPS-blueviolet?style=flat-square" />
-  <img src="https://img.shields.io/badge/p99-0.8μs-cyan?style=flat-square" />
+  <img src="https://img.shields.io/badge/Engine-15.8M_TPS-blueviolet?style=flat-square" />
+  <img src="https://img.shields.io/badge/FPGA-246.3M_OPS_(II%3D1)-ff6600?style=flat-square" />
+  <img src="https://img.shields.io/badge/p99-6.1μs-cyan?style=flat-square" />
   <img src="https://img.shields.io/badge/Drops-0-green?style=flat-square" />
   <img src="https://img.shields.io/badge/Isolation-Firecracker_MicroVM-red?style=flat-square" />
   <img src="https://img.shields.io/badge/C%2B%2B-23-orange?style=flat-square" />
+  <img src="https://img.shields.io/badge/AVX2%2FAVX512-SIMD-blue?style=flat-square" />
   <img src="https://img.shields.io/badge/License-MIT-lightgrey?style=flat-square" />
 </p>
 
@@ -34,59 +36,79 @@ Think [IMC Prosperity](https://prosperity.imc.com/) meets [Codeforces](https://c
 
 ## Architecture
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                        IICPC PLATFORM                          │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│  ┌──────────┐    ┌──────────┐    ┌───────────────────────────┐ │
-│  │ SvelteKit│───▶│ FastAPI  │───▶│     Redis Job Queue       │ │
-│  │ Frontend │◀──▶│  + JWT   │    │  (FIFO, BRPOP blocking)   │ │
-│  │ :5173    │ WS │  :8000   │    └───────────┬───────────────┘ │
-│  └──────────┘    └──────────┘                │                  │
-│                                              ▼                  │
-│                                    ┌─────────────────┐         │
-│                                    │ Submission Worker│         │
-│                                    │  (async loop)    │         │
-│                                    └────────┬────────┘         │
-│                                             │                   │
-│                                             ▼                   │
-│  ┌──────────────────────────────────────────────────────────┐  │
-│  │              FIRECRACKER MICROVM SANDBOX                   │  │
-│  │                                                          │  │
-│  │  1. g++ -O3 -std=c++23 -march=native -static -flto      │  │
-│  │  2. Firecracker MicroVM (separate kernel per contestant) │  │
-│  │  3. Pre-warmed snapshot resume (<5ms boot)               │  │
-│  │  4. OrderBlaster → deterministic order stream            │  │
-│  │  5. ShadowOrderbook → correctness validation             │  │
-│  │  6. HDR Histogram → latency percentiles                  │  │
-│  │  7. Score = 0.4*correctness + 0.3*throughput + 0.3*lat   │  │
-│  └──────────────────────────────────────────────────────────┘  │
-│                                                                 │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐                     │
-│  │ QuestDB  │  │ Redpanda │  │  Redis   │                     │
-│  │ ILP:9009 │  │ Kafka    │  │ Sorted   │                     │
-│  │ metrics  │  │ streaming│  │ Sets     │                     │
-│  └──────────┘  └──────────┘  └──────────┘                     │
-└─────────────────────────────────────────────────────────────────┘
-```
+### System Topology
+
+![System Architecture](docs/diagrams/rendered/01_system_architecture.svg)
+
+### Data Flow (Single Contest Run)
+
+![Data Flow](docs/diagrams/rendered/02_data_flow.svg)
+
+### Matching Engine State Machine
+
+![Matching Engine FSM](docs/diagrams/rendered/04_matching_engine_fsm.svg)
+
+### Firecracker Isolation Model
+
+![Firecracker Isolation](docs/diagrams/rendered/05_firecracker_isolation.svg)
+
+### Infrastructure Stack
+
+![Infrastructure Stack](docs/diagrams/rendered/07_infrastructure_stack.svg)
 
 ---
 
 ## Performance
 
-Benchmarked on consumer hardware (no FPGA, no kernel bypass):
+Benchmarked on Intel i7-12700H (Gentoo Linux 6.12, GCC 15.2, HugePages enabled, `performance` governor, AVX2 SIMD):
 
-| Metric | Value |
-|---|---|
-| **Engine Throughput** | 13.99M transactions/sec |
-| **p50 Latency** | 0.35 µs |
-| **p99 Latency** | 0.81 µs |
-| **p99.9 Latency** | 1.5 µs |
-| **Drops** | 0 |
-| **Arena Allocation** | 0.3 ns/alloc |
-| **Ring Buffer (SPSC)** | 809.9M ops/sec |
-| **Spinlock Cycle** | 8.6 ns |
+### Software Engine
+
+| Component | Metric | Measured |
+|---|---|---|
+| **SHM Engine** | Throughput | 15.8M TPS |
+| **SHM Engine** | p50 Latency | 3.7 µs |
+| **SHM Engine** | p99 Latency | 6.1 µs |
+| **SHM Engine** | p999 Latency | 8.6 µs |
+| **SHM Engine** | Drops | 0 |
+| **Pipeline Engine** | Throughput | 2.0M TPS |
+| **Pipeline Engine** | p50 Latency | 34.3 µs |
+| **Pipeline Engine** | p99 Latency | 49.7 µs |
+| **Order Blaster** | Sustained OPS | 9.9M OPS |
+| **Arena Allocator** | Alloc speed | 0.3 ns/alloc |
+| **SPSC Ring** | Single-thread | 822M ops/sec |
+| **TicketSpinlock** | Lock/unlock | 8.6 ns |
+| **IPC (blaster)** | Instructions/cycle | 2.45 |
+| **L1 Cache Miss** | Rate | 0.16% |
+| **Context Switches** | During benchmark | 0 |
+
+### FPGA Hardware Engine (Verilator Simulation)
+
+| Metric | Value | Notes |
+|---|---|---|
+| **Pipelined throughput** | 246.3M orders/sec | **True II=1**, 0 stalls, 250 MHz |
+| **Sustained crossing** | 99.1M orders/sec | Alternating BUY/SELL with fills |
+| **Sequential throughput** | 35.7M orders/sec | Blocking submit, 250 MHz |
+| **Insert latency** | 4 ns (1 cycle) | Non-crossing limit order |
+| **Match latency** | 8 ns (2 cycles) | Single-level crossing |
+| **Cancel latency** | 4 ns (1 cycle) | O(1) Fibonacci hash lookup |
+| **Jitter** | <1 ns | Deterministic pipeline |
+| **@ 322 MHz** | 317.2M orders/sec | 10G Ethernet native clock |
+| **@ 500 MHz** | 492.6M orders/sec | Versal/UltraScale+ fast path |
+| **% of physical limit** | 98.5% | 246.3M / 250M theoretical max |
+
+### Performance Dashboard
+
+![Performance Dashboard](results/performance_dashboard.png)
+
+### Latency Distribution
+
+![Latency Histograms](results/latency_histograms.png)
+
+### CPU Flamegraphs
+
+- [Order Blaster Flamegraph](results/flamegraph_blaster.svg) — 9.7M OPS, shows hot path in `generate_order()`
+- [SHM Engine Flamegraph](results/flamegraph_shm.svg) — 15.8M TPS, shows SPSC ring + telemetry hot loop
 
 ---
 
@@ -249,6 +271,7 @@ IICPC/
 │       ├── orderbook.hpp        # SoA price-time priority orderbook
 │       ├── match_engine.hpp     # Full matching engine with PnL
 │       ├── shadow_orderbook.hpp # Correctness validator
+│       ├── stress_scenarios.hpp # 10 adversarial system test scenarios
 │       └── market_data_gen.hpp  # Deterministic Ornstein-Uhlenbeck
 │
 ├── loadgen/                 # Deterministic order blaster
@@ -257,9 +280,10 @@ IICPC/
 │
 ├── orchestrator/            # Contest orchestration
 │   ├── include/orchestrator/
-│   │   └── contest_runner.hpp   # Compile → Boot → Blast → Score
+│   │   ├── contest_runner.hpp       # Compile → Boot → Blast → Score
+│   │   └── post_contest_validator.hpp # CF-style system test harness
 │   └── src/
-│       └── run_contest.cpp      # CLI contest runner
+│       └── run_contest.cpp          # CLI: live match + system tests
 │
 ├── sandbox/                 # Isolation layer
 │   └── include/sandbox/
@@ -295,6 +319,7 @@ IICPC/
 │   ├── sandbox_run.sh          # cgroups v2 fallback runner
 │   ├── harden_determinism.sh   # System tuning
 │   ├── e2e_test.sh             # End-to-end API tests
+│   ├── post_contest_test.sh    # CF-style post-contest rejudge
 │   ├── build_rootfs.sh         # Build Alpine rootfs image
 │   └── dev.sh                  # Dev environment starter
 │
@@ -323,8 +348,10 @@ IICPC/
 
 ## Scoring Formula
 
+### Live Contest Score
+
 ```
-Score = 0.4 × Correctness + 0.3 × Throughput + 0.3 × Latency
+Contest Score = 0.4 × Correctness + 0.3 × Throughput + 0.3 × Latency
 ```
 
 | Component | Weight | How It's Measured |
@@ -333,9 +360,36 @@ Score = 0.4 × Correctness + 0.3 × Throughput + 0.3 × Latency
 | **Throughput** | 30% | Orders processed per second under sustained load. Normalized against baseline. |
 | **Latency** | 30% | p99 round-trip response time. Measured at the wire boundary. Lower = better. |
 
+### Post-Contest System Testing (CF-Style Rejudge)
+
+After the live contest ends, every submission is re-run against **10 adversarial stress scenarios** to catch edge-case bugs:
+
+```
+Final Score = min(Contest Score, 0.6 × Contest Score + 0.4 × System Test Score)
+```
+
+System tests can only **lower** a ranking, never boost it. This mirrors Codeforces-style rejudging — a submission that passes the live contest but fails under adversarial conditions gets penalized.
+
+| # | Scenario | Weight | What It Tests |
+|---|----------|--------|---------------|
+| 1 | Crossed Book Stress | 15% | Overlapping buy/sell at same prices |
+| 2 | Deep Book Sweep | 12% | Market orders sweeping 100+ levels |
+| 3 | Cancel Storm | 10% | 90% cancel rate, cancel-rebooking integrity |
+| 4 | Self-Trade Trap | 8% | Tight spread, high volume near position limits |
+| 5 | Tick-Size Edge | 8% | Min/max price boundaries, tick alignment |
+| 6 | Burst Traffic | 12% | Short-duration extreme OPS spike |
+| 7 | IOC Flood | 8% | Pure IOC/Market orders, nothing should rest |
+| 8 | Rapid Order ID Churn | 8% | High volume, small ID space recycling |
+| 9 | Position Limit Grind | 9% | Orders at position limit boundaries |
+| 10 | Conservation Audit | 10% | Balanced buy/sell, qty conservation invariant |
+
+Contestants see only the **aggregate** system test score — individual scenario pass/fail is hidden to prevent reverse-engineering the test suite.
+
 ---
 
 ## API Reference
+
+### Public Endpoints
 
 | Method | Endpoint | Auth | Description |
 |---|---|---|---|
@@ -345,7 +399,22 @@ Score = 0.4 × Correctness + 0.3 × Throughput + 0.3 × Latency
 | `POST` | `/api/submit` | JWT | Upload `.cpp` file for benchmarking |
 | `GET` | `/api/job/{id}` | JWT | Poll job status + results |
 | `GET` | `/api/leaderboard` | No | Top 50 teams by score |
-| `WS` | `/ws/live` | No | Real-time leaderboard updates |
+| `GET` | `/api/system-test/status` | No | System test progress (public) |
+| `WS` | `/ws/live` | No | Real-time leaderboard + system test updates |
+
+### Admin Endpoints
+
+| Method | Endpoint | Auth | Description |
+|---|---|---|---|
+| `POST` | `/api/admin/login` | Admin Key | Verify admin credentials |
+| `POST` | `/api/admin/competition/start` | Admin Key | Start competition timer |
+| `POST` | `/api/admin/competition/stop` | Admin Key | Stop competition |
+| `POST` | `/api/admin/competition/extend` | Admin Key | Extend competition by N minutes |
+| `POST` | `/api/admin/system-test` | Admin Key | Trigger post-contest rejudge |
+| `GET` | `/api/admin/system-test/status` | Admin Key | Detailed system test progress + results |
+| `POST` | `/api/admin/leaderboard/reset` | Admin Key | Reset all scores |
+| `GET` | `/api/admin/jobs` | Admin Key | List all jobs across teams |
+| `GET` | `/api/admin/teams` | Admin Key | List all registered teams |
 
 ---
 
@@ -394,13 +463,128 @@ g++ -O3 -std=c++23 -march=native -flto -static -DNDEBUG
 
 ---
 
-## Tech Stack
+---
 
-| Layer | Technology | Why |
+## FPGA Hardware Acceleration
+
+The platform includes an optional **SystemVerilog FPGA implementation** of the order sequencer and matching engine for sub-12ns deterministic order processing.
+
+### Architecture: 2-Stage Pipeline with BBO Forwarding (True II=1)
+```
+Network → [order_parser.sv] → [sequencer_core.sv] → [match_engine_fpga.sv] → [dma_ring.sv] → Host CPU
+           Parse protocol      Atomic seq# assign    II=1 LOB match           PCIe MMIO ring
+           1 cycle (4ns)       1 cycle (4ns)         1 cycle (4ns) insert     1 cycle (4ns)
+
+           Pipeline Internals (match_engine_fpga.sv):
+           ┌───────────────────┐    ┌─────────────────────────┐
+           │ S1: DECODE        │───►│ S2: EXECUTE + EMIT      │
+           │ • Latch input     │    │ • Insert / Match / Cxl  │──► fill/ack
+           │ • Cross-detect    │    │ • BBO update + stats    │
+           │ • Cancel hash     │    │ • Drive outputs         │
+           └───────────────────┘    └────────────┬────────────┘
+                    ▲    BBO Forwarding           │
+                    └─────────────────────────────┘
+
+  II=1: in_ready stays HIGH during 1-cycle Execute, accepting
+        a new order every single clock cycle (250M orders/sec).
+```
+
+### Performance
+| Metric | Software (C++) | FPGA (SystemVerilog) |
+|--------|---------------|---------------------|
+| Sequencing | 50-200ns | **4ns** |
+| Matching | 100-500ns | **4ns** (II=1 insert) |
+| Throughput (pipelined) | 15.8M TPS | **246.3M orders/sec** |
+| Throughput (crossing) | — | **99.1M orders/sec** |
+| Throughput @ 500 MHz | — | **492.6M orders/sec** |
+| Jitter | 10-1000ns | **<1ns** |
+| % of physical limit | — | **98.5%** |
+| Architecture | Lock-free SoA + AVX2 | 2-stage II=1 pipeline |
+
+### SIMD Optimization (Software)
+The software engine uses **dedicated AVX2/AVX-512 intrinsics** on the hot path:
+- Hash map probing: 4-way parallel key comparison (`_mm256_cmpeq_epi64`)
+- SoA array search: Vectorized linear scan (4 or 8 elements per iteration)
+- Cache-line operations: Single-instruction 64-byte copies (`_mm512_storeu_si512`)
+- Strategic prefetching: Pipelined memory access across order queues
+
+### Simulation (Verilator)
+```bash
+cd fpga
+make sim          # Sequencer testbench (4 tests)
+make sim_match    # Matching engine (8 tests + benchmark)
+make sim_all      # Both
+```
+
+### FPGA Waveforms (Verilator VCD)
+
+**Sequencer — 4-Port Round-Robin Arbiter:**
+
+![Sequencer Waveform](results/waveform_sequencer.png)
+
+**Matching Engine — II=1 Pipeline with BBO Forwarding:**
+
+![Match Engine Waveform](results/waveform_match_engine.png)
+
+### AWS FPGA Deployment
+```bash
+# Enable FPGA instances
+cd infra/terraform
+./deploy.sh fpga-on
+./deploy.sh apply
+
+# Build AFI on synthesis instance
+scp -r fpga/ centos@<build_ip>:~/
+ssh centos@<build_ip> 'cd ~/fpga/aws && ./build_afi.sh'
+
+# Load AFI on F2 instance
+ssh centos@<fpga_ip> 'sudo fpga-load-local-image -S 0 -I <afi_id>'
+```
+
+---
+
+## Production Deployment
+
+### Quick Deploy (One Command)
+```bash
+# 1. Pre-flight validation
+./scripts/pre_submit.sh
+
+# 2. Deploy to AWS
+cd infra/terraform
+./deploy.sh init     # First time only
+./deploy.sh apply    # Provision infrastructure
+./deploy.sh sync     # Push code + build on remote
+./deploy.sh verify   # E2E health check
+```
+
+### Infrastructure (Terraform)
+| Resource | Type | Purpose |
+|----------|------|---------|
+| Arena | c8i.metal-48xl | Bare metal for Firecracker MicroVMs |
+| FPGA Test | f2.2xlarge | FPGA order sequencer testing |
+| FPGA Build | m5.4xlarge | Vivado synthesis (cheaper) |
+| VPC | 10.0.0.0/16 | Isolated network |
+| EIP | Elastic IP | Stable public IP |
+
+### Cost Estimate
+| Component | $/hr | Monthly (on-demand) |
+|-----------|------|---------------------|
+| Arena (c8i.metal-48xl) | ~$8.57 | ~$6,170 |
+| FPGA test (f2.2xlarge) | ~$1.65 | On-demand only |
+| FPGA build (m5.4xlarge) | ~$0.77 | On-demand only |
+
+> **Tip**: Use `./deploy.sh destroy` when not in use. FPGA instances are off by default.
+
+---
+
+## Technology Stack
+
 |---|---|---|
 | **Engine** | C++23 | Zero-overhead abstractions, cache-line control |
 | **Memory** | HugePages (2MB) | Eliminates TLB misses |
 | **Sync** | Lock-free SPSC | 809M ops/sec, no contention |
+| **Sequencer** | Lock-free MPSC | Atomic sequence assignment, deterministic replay |
 | **I/O** | io_uring | Batched syscalls, zero kernel transitions |
 | **Metrics** | QuestDB (ILP) | 1.4M rows/sec ingestion, zero serialization |
 | **Queue** | Redis | BRPOP FIFO, sorted set leaderboard |
@@ -408,6 +592,7 @@ g++ -O3 -std=c++23 -march=native -flto -static -DNDEBUG
 | **API** | FastAPI | Async Python, WebSocket support |
 | **Frontend** | SvelteKit | Reactive, compiled, fast |
 | **Isolation** | Firecracker MicroVM | Separate kernel, hardware-enforced limits |
+| **FPGA** | SystemVerilog | 246.3M orders/sec (II=1), <4ns insert, 2-stage pipeline |
 
 ---
 

@@ -27,6 +27,7 @@
 #include "core/spinlock.hpp"
 #include "core/arena.hpp"
 #include "sdk/protocol.hpp"
+#include "sdk/strategy_sdk.hpp"
 #include "loadgen/order_blaster.hpp"
 
 #include <cerrno>
@@ -40,23 +41,7 @@
 
 namespace iicpc {
 
-// =============================================================================
-// Response from contestant (what they send back after processing an order)
-// =============================================================================
-struct alignas(64) ContestantResponse {
-    uint32_t order_id;         // Echo back the order's client_order_id
-    MsgType  response_type;    // ORDER_ACK or FILL
-    AckStatus ack_status;      // If ORDER_ACK
-    uint8_t  _pad0;
-    uint8_t  num_fills;        // Number of fills this order generated
-    int64_t  fill_price;       // Fill price (if fill)
-    int32_t  fill_qty;         // Fill quantity (if fill)
-    int32_t  remaining_qty;    // Remaining on resting order
-    uint64_t recv_tsc;         // TSC when we read this response (host-side)
-    uint64_t send_tsc;         // TSC when we sent the order (host-side)
-    uint8_t  _pad1[16];
-};
-static_assert(sizeof(ContestantResponse) == 64);
+// ContestantResponse is defined in sdk/strategy_sdk.hpp
 
 // =============================================================================
 // Latency record (per-order timing)
@@ -280,6 +265,15 @@ public:
         std::memcpy(&out, &latencies_[lat_head_ % LATENCY_RING_SIZE], sizeof(out));
         lat_head_++;
         return true;
+    }
+
+    // =========================================================================
+    // Send a control message (SessionStart/SessionEnd) — blocking
+    // =========================================================================
+    bool send_control(const void* msg, size_t len) noexcept {
+        if (client_fd_ < 0) return false;
+        ssize_t n = ::send(client_fd_, msg, len, MSG_NOSIGNAL);
+        return n == static_cast<ssize_t>(len);
     }
 
     void shutdown() noexcept {

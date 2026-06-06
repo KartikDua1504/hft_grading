@@ -1,0 +1,57 @@
+
+╔══════════════════════════════════════════════════════════╗
+║   PIPELINE MULTIPLEXED BENCHMARK                        ║
+║   writev() scatter-gather, 4 sockets for 100 bots      ║
+║   Target: <20µs p50, >1M TPS                            ║
+╚══════════════════════════════════════════════════════════╝
+
+[arena] Allocated 1024 MiB with 2MB huge pages at 0x7fb599600000
+[tsc] Calibrated: 2.688 GHz (0.372 ns/tick, measured over 100 ms)
+[exchange-ultra] Listening on Unix: /tmp/iicpc_pipe.sock
+[payload_gen] Pre-generated 100 payloads (64 bytes each)
+[pipeline] 4/4 pool connections (Unix), 100 bots assigned
+
+[bench] === PIPELINE BENCHMARK START (5 seconds) ===
+
+[telemetry] Consumer started (report every 1000 ms)
+[telemetry] TPS=2060979  total=2060979  dropped=0  p50=34.8us  p90=47.9us  p99=52.2us  p999=171.0us  max=5367.5us
+[telemetry] TPS=2107862  total=4168841  dropped=0  p50=34.6us  p90=47.6us  p99=50.9us  p999=71.2us  max=5367.5us
+[telemetry] TPS=2092733  total=6261574  dropped=0  p50=34.6us  p90=47.6us  p99=50.2us  p999=66.0us  max=5367.5us
+[telemetry] TPS=2092645  total=8354219  dropped=0  p50=34.6us  p90=47.6us  p99=49.7us  p999=62.7us  max=5367.5us
+[telemetry] TPS=2092548  total=10446767  dropped=0  p50=34.3us  p90=47.6us  p99=49.7us  p999=60.4us  max=5367.5us
+
+[telemetry] === FINAL REPORT ===
+[telemetry] Total samples: 10446767
+[telemetry] Max seq seen: 10446766
+[telemetry] Computed drops: 0
+[hdr] samples=10446767  min=3.3us  p50=34.3us  p90=47.6us  p99=49.7us  p999=60.4us  max=5367.5us
+
+╔══════════════════════════════════════════════════════════════╗
+║             PIPELINE BENCHMARK RESULTS                      ║
+╠══════════════════════════════════════════════════════════════╣
+║  Duration:     5.00 seconds                                ║
+║  Transport:    Unix Domain Socket                            ║
+║  Pool Size:    4                                             ║
+║  Bots:         100                                           ║
+║                                                              ║
+║  Total Sends:  10446767                                      ║
+║  Total Recvs:  10446767                                      ║
+║  Drops:        0                                             ║
+║  TPS:          2089352                                       ║
+║                                                              ║
+║  Latency:                                                    ║
+║    min:          3.3 µs                                       ║
+║    p50:         34.3 µs                                       ║
+║    p90:         47.6 µs                                       ║
+║    p99:         49.7 µs                                       ║
+║    p999:        60.4 µs                                       ║
+║    max:       5367.5 µs                                       ║
+║                                                              ║
+║  [✓] TPS ≥ 100k                                          ║
+║  [✓] TPS ≥ 1M                                             ║
+║  [✓] Zero drops                                           ║
+║  [✗] p50 < 5µs (HFT-tier)                                ║
+║  [✗] p50 < 20µs (pipeline-tier)                           ║
+║  [✓] p50 < 50µs (exchange-tier)                           ║
+║  [✓] p99 < 100µs (deterministic)                          ║
+╚══════════════════════════════════════════════════════════════╝

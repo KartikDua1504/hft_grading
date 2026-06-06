@@ -1,2 +1,5 @@
 infra/firecracker/contestant_rootfs.ext4
 infra/firecracker/snapshots/snapshot_mem
+infra/terraform/.terraform/
+fpga/build/
+fpga/dump.vcd

@@ -42,7 +42,7 @@ private:
     uint64_t total_count_ = 0;
     uint64_t min_value_ = UINT64_MAX;
     uint64_t max_value_ = 0;
-    double total_sum_ = 0.0;
+    uint64_t total_sum_ = 0;      // Integer sum — cast to double only in get_percentiles()
     uint64_t lowest_trackable_ = 1;
     uint64_t highest_trackable_ = 10'000'000'000ULL;
     int sub_bucket_half_count_magnitude_ = 0;

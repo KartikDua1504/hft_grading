@@ -80,7 +80,9 @@ public:
     /// The region must be at least TOTAL_SIZE bytes, cache-line aligned.
     /// @param region  Pointer to the shared memory region
     /// @param is_init If true, initialize the header (producer side). If false, attach (consumer).
-    explicit SPSCRingBuffer(void* region, bool is_init) noexcept
+    /// @param timeout_us Timeout in microseconds for consumer to wait for producer init (0 = infinite).
+    ///                   Default 100ms. Returns with init_failed() == true if timeout expires.
+    explicit SPSCRingBuffer(void* region, bool is_init, uint64_t timeout_us = 100'000) noexcept
         : header_(static_cast<RingBufferHeader*>(region))
         , data_(reinterpret_cast<T*>(static_cast<uint8_t*>(region) + DATA_OFFSET))
     {
@@ -96,11 +98,26 @@ public:
             std::atomic_thread_fence(std::memory_order_release);
         } else {
             // Validate magic (consumer is attaching to existing buffer)
-            // Spin-wait until producer has initialized
+            // Bounded spin-wait with timeout to prevent deadlock if producer crashes.
+            // Uses rdtsc for sub-microsecond precision without syscalls.
+            const uint64_t start = __rdtsc();
+            // Approximate: assume ~2.5 GHz base clock → 2500 cycles/µs
+            // Over-estimate slightly to avoid premature timeout
+            const uint64_t timeout_cycles = timeout_us * 3000ULL;
+            bool timed_out = false;
             while (header_->magic != RING_BUFFER_MAGIC) {
                 _mm_pause(); // x86 spin-wait hint
+                if (timeout_us > 0 && (__rdtsc() - start) > timeout_cycles) {
+                    timed_out = true;
+                    break;
+                }
             }
-            std::atomic_thread_fence(std::memory_order_acquire);
+            if (timed_out) {
+                // Mark as failed — caller must check init_failed()
+                init_failed_ = true;
+            } else {
+                std::atomic_thread_fence(std::memory_order_acquire);
+            }
         }
     }
 
@@ -159,6 +176,27 @@ public:
         return to_push;
     }
 
+    /// Batch pop: try to pop multiple elements. Returns count actually popped.
+    /// Symmetric to try_push_batch() for the consumer side.
+    /// Uses prefetching to pipeline memory reads.
+    std::size_t try_pop_batch(T* items, std::size_t max_count) noexcept {
+        const uint64_t r = header_->read_pos.load(std::memory_order_relaxed);
+        const uint64_t w = header_->write_pos.load(std::memory_order_acquire);
+        const uint64_t available = w - r;
+        const std::size_t to_pop = max_count < available ? max_count : static_cast<std::size_t>(available);
+
+        for (std::size_t i = 0; i < to_pop; ++i) {
+            // Prefetch next element while copying current
+            if (i + 4 < to_pop) {
+                prefetch_read_l1(&data_[(r + i + 4) & MASK]);
+            }
+            items[i] = data_[(r + i) & MASK];
+        }
+
+        header_->read_pos.store(r + to_pop, std::memory_order_release);
+        return to_pop;
+    }
+
     /// Query how many elements are available to read
     [[nodiscard]] std::size_t size() const noexcept {
         const uint64_t w = header_->write_pos.load(std::memory_order_acquire);
@@ -168,6 +206,9 @@ public:
 
     [[nodiscard]] bool empty() const noexcept { return size() == 0; }
     [[nodiscard]] bool full() const noexcept { return size() >= Capacity; }
+
+    /// Check if consumer-side initialization timed out (producer may have crashed)
+    [[nodiscard]] bool init_failed() const noexcept { return init_failed_; }
 
     /// Verify that the indices are on separate cache lines (runtime check)
     [[nodiscard]] static bool verify_cache_line_separation(const void* region) noexcept {
@@ -181,6 +222,7 @@ public:
 private:
     RingBufferHeader* header_;
     T* data_;
+    bool init_failed_ = false;
 };
 
 // =============================================================================

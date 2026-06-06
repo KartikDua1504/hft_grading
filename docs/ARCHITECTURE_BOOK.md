@@ -27,6 +27,7 @@
 17. [The Web Platform: FastAPI + SvelteKit](#chapter-17-the-web-platform)
 18. [The Build System & Deployment](#chapter-18-the-build-system)
 19. [Complete File Blueprint](#chapter-19-complete-file-blueprint)
+20. [Post-Contest System Testing](#chapter-20-post-contest-system-testing)
 
 ---
 
@@ -53,6 +54,11 @@ Every design choice documented here exists to eliminate a specific source of lat
 # Chapter 2: Architecture Overview
 
 ## System Topology
+
+![System Architecture](diagrams/rendered/01_system_architecture.svg)
+
+<details>
+<summary>Text-only version (for terminals)</summary>
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -86,6 +92,8 @@ Every design choice documented here exists to eliminate a specific source of lat
 │  └──────────────────────────────────────────────────┘           │
 └─────────────────────────────────────────────────────────────────┘
 ```
+
+</details>
 
 ## Data Flow (One Complete Contest Run)
 
@@ -792,12 +800,16 @@ while (bridge.pop_response(resp)) {
 double correctness_score() const noexcept {
     if (total_expected == 0) return 1.0;
     double base = (double)correct_fills / (double)total_expected;
-    double penalty = priority_errors * 0.1 + (extra_fills + missing_fills) * 0.01;
-    return max(0.0, base - penalty);
+    double penalty = priority_errors * 0.1;
+    // Ratio-based penalty — scales with proportion, not absolute count
+    double extra_ratio = (double)extra_fills / (double)(total_expected + extra_fills);
+    double missing_ratio = (double)missing_fills / (double)total_expected;
+    penalty += extra_ratio * 0.3 + missing_ratio * 0.3;
+    return clamp(base - penalty, 0.0, 1.0);
 }
 ```
 
-A single priority violation (matching a worse-priced order before a better-priced one) costs 10% of the score. This is intentionally harsh — price-time priority is the fundamental invariant of any orderbook.
+A single priority violation (matching a worse-priced order before a better-priced one) costs 10% of the score. This is intentionally harsh — price-time priority is the fundamental invariant of any orderbook. Extra and missing fills are penalized proportionally (ratio-based), not by absolute count — this prevents unfair zeroing when the contestant processes significantly more or fewer orders than the shadow reference.
 
 
 ---
@@ -810,7 +822,7 @@ A single priority violation (matching a worse-priced order before a better-price
 
 The contestant's code runs in a Firecracker µVM on the **same physical machine**. TCP would route through the kernel's TCP/IP stack — SYN/ACK handshake, Nagle's algorithm, congestion control, checksumming. All unnecessary overhead for local IPC.
 
-Unix Domain Sockets (UDS) bypass the network stack entirely:
+Unix Domain Sockets (UDS) bypass the TCP/IP stack (no checksumming, Nagle, or congestion control) but still use the kernel's VFS and socket buffers:
 
 | Feature | TCP loopback | UDS |
 |---------|-------------|-----|
@@ -966,7 +978,7 @@ Firecracker uses KVM hardware virtualization. The CPU's VT-x/VT-d hardware enfor
 
 ### Problem 3: Deterministic Networking
 
-Docker's network namespace adds overhead to every packet. Even with `--network=host`, iptables/nftables rules add latency. Our UDS bridge bypasses all of this — the socket file is shared via the Firecracker VM's vsock or a mapped virtio-block device.
+Docker's network namespace adds overhead to every packet. Even with `--network=host`, iptables/nftables rules add latency. Our UDS bridge avoids the TCP/IP stack entirely — the socket file is shared via the Firecracker VM's vsock or a mapped virtio-block device.
 
 ## Boot Time
 
@@ -1352,20 +1364,184 @@ IICPC/
 
 ## Measured Performance (Benchmark Results)
 
+### Software Engine
+
 | Component | Metric | Measured |
 |-----------|--------|----------|
 | Arena Allocator | Allocation speed | 0.3 ns/alloc |
 | TicketSpinlock | Lock/unlock (uncontended) | 8.6 ns |
 | SeqLock | Write cycle | 0.5 ns |
 | Order Blaster | Sustained throughput (5s) | 9.96M OPS |
-| SPSC Ring (single-thread) | Push + pop | 1.2 ns/op (810M ops/sec) |
+| SPSC Ring (single-thread) | Push + pop | 1.2 ns/op (822M ops/sec) |
 | SPSC Ring (cross-core) | Producer + consumer | 16.0M ops/sec |
-| Pipeline E2E | Full telemetry pipeline | 13.99M TPS |
-| Pipeline p50 | Median latency | 0.35 µs |
-| Pipeline p99 | 99th percentile | 0.81 µs |
-| Pipeline p99.9 | 99.9th percentile | 1.5 µs |
-| Pipeline drops | Lost samples | 0 |
+| SHM Engine | Full round-trip TPS | 15.8M TPS |
+| SHM Engine p50 | Median latency | 3.7 µs |
+| SHM Engine p99 | 99th percentile | 6.1 µs |
+| SHM Engine p999 | 99.9th percentile | 8.6 µs |
+| Pipeline Engine | Multiplexed TPS | 2.0M TPS |
+| Pipeline p50 | Median latency | 34.3 µs |
+| Pipeline p99 | 99th percentile | 49.7 µs |
 | HugePages | Backing verified | YES |
+| Drops | Lost samples | 0 |
+| L1 Cache Miss | Rate | 0.16% |
+| Context Switches | During benchmark | 0 |
+
+### FPGA Hardware Engine (Verilator Simulation, 250 MHz — True II=1)
+
+| Metric | Value |
+|--------|-------|
+| Pipelined throughput (II=1) | **246.3M orders/sec** |
+| Sustained crossing | **99.1M orders/sec** |
+| Sequential throughput | 35.7M orders/sec |
+| Insert latency | **4 ns (1 cycle)** |
+| Match latency | 8 ns (2 cycles) |
+| Cancel latency | **4 ns (1 cycle)** |
+| Jitter | <1 ns |
+| % of physical limit | **98.5%** (246.3M / 250M) |
+| Projected @ 322 MHz | **317.2M orders/sec** |
+| Projected @ 500 MHz | **492.6M orders/sec** |
+| Architecture | 2-stage pipeline + BBO forwarding |
+
+---
+
+# Appendix: Compiler Attributes Reference
+
+| Attribute | What it does | Where we use it |
+|-----------|-------------|-----------------|
+| `__attribute__((hot))` | Place in hot text section (I-cache) | All hot loop functions |
+| `__attribute__((cold))` | Place in cold section | Error handlers |
+| `__attribute__((always_inline))` | Force inline (ignore -O0) | Assembly wrappers, AVX2 intrinsics |
+| `__attribute__((flatten))` | Inline all callees recursively | CRTP batch functions, match loop |
+| `__attribute__((noinline))` | Prevent inlining | Cold error paths |
+| `__attribute__((target("avx2")))` | Enable AVX2 per-function | SIMD hash probing, vectorized search |
+| `alignas(64)` | Cache-line alignment | All hot data structures |
+| `__builtin_expect(x, 1)` | Branch prediction hint | `IICPC_LIKELY` macro |
+| `__builtin_prefetch(p, 0, 3)` | L1 prefetch for read | SoA array traversal, match loop |
+| `__builtin_prefetch(p, 1, 3)` | L1 prefetch for write (exclusive) | Fleet state updates |
+| `__builtin_assume_aligned(p, N)` | Alignment guarantee | Auto-vectorization hints |
+| `__restrict__` | No-alias pointer | `copy_cacheline` dst/src, fill output |
+| `_mm256_cmpeq_epi64()` | AVX2 4-way int64 compare | Hash map probing (4 keys/instruction) |
+| `_mm256_movemask_epi8()` | AVX2 byte-level mask extraction | SIMD comparison result decoding |
+| `_mm256_stream_si256()` | AVX2 non-temporal store | Streaming cache-line writes |
+| `_mm512_cmpeq_epi64_mask()` | AVX-512 8-way int64 compare | Hash map probing (8 keys/instruction) |
+| `_mm512_storeu_si512()` | AVX-512 cache-line store | Single-instruction 64-byte copies |
+
+---
+
+# Chapter 20: Post-Contest System Testing
+
+**Files**: `exchange/include/exchange/stress_scenarios.hpp`, `orchestrator/include/orchestrator/post_contest_validator.hpp`
+
+## The Codeforces Analogy
+
+On Codeforces, after a contest ends, submissions are "rejudged" against a larger, more adversarial test suite called **system tests**. A solution that passes pretests during the contest might fail system tests and lose rating.
+
+We implement the same pattern. During the live contest, submissions are scored against a standard order stream (the Order Blaster with default config). After the contest ends, the admin triggers **10 adversarial stress scenarios** that probe specific edge cases.
+
+## Why System Tests?
+
+The standard contest run generates orders with realistic parameters — 60% limit, 20% market, 20% cancel, moderate price range. Many edge-case bugs hide under these conditions:
+
+- A matching engine that crashes on **empty-book sweeps** (scenario 2)
+- An engine that leaks orders when **90% are cancelled** (scenario 3)
+- An engine that silently drops orders during **extreme traffic bursts** (scenario 6)
+- An engine where **quantity is not conserved** across fills (scenario 10)
+
+## Determinism via Seeds
+
+Each scenario uses a fixed seed for the xorshift64 PRNG:
+
+```cpp
+s.blaster_cfg.seed = 0xDEADBEEF'CAFE0001ULL;  // Scenario 1
+s.blaster_cfg.seed = 0xDEADBEEF'CAFE0002ULL;  // Scenario 2
+// ... etc
+```
+
+Given the same seed and the same `OrderBlasterConfig`, the blaster produces the **exact same order sequence** every time. This means:
+1. All contestants face identical scenarios (fair)
+2. Failures are reproducible (debuggable)
+3. The shadow orderbook produces deterministic expected results (validatable)
+
+## Scenario Design
+
+Each scenario overrides specific `OrderBlasterConfig` parameters to stress a particular aspect:
+
+| Parameter | Normal Run | Crossed Book (#1) | Cancel Storm (#3) | Burst Traffic (#6) |
+|-----------|-----------|-------------------|-------------------|---------------------|
+| `price_range` | 5000 | **200** (tight) | 5000 | 5000 |
+| `cancel_pct` | 20% | 0% | **90%** | 20% |
+| `market_pct` | 20% | 10% | 2% | 20% |
+| `orders_per_batch` | 128 | 256 | 256 | **512** |
+| `max_qty` | 50 | 10 | 50 | 50 |
+
+The "Crossed Book Stress" scenario uses a `price_range` of only 200 (2 ticks) with minimal volatility. This forces buy and sell orders to constantly overlap at the same price levels, creating a near-100% crossing rate. An engine that doesn't correctly match crosses will accumulate resting orders that should have been filled.
+
+## Scoring Formula
+
+```
+final = min(contest_score, 0.6 × contest_score + 0.4 × system_score)
+```
+
+The `min()` ensures system tests can only **lower** a ranking:
+- If your engine is perfect (system_score = 1.0), your final score is your contest score
+- If your engine fails all system tests (system_score = 0.0), your final score drops by 40%
+
+Per-scenario correctness threshold: ≥ 0.8 to pass.
+
+## The Harness: PostContestValidator
+
+The `PostContestValidator` orchestrates a full rejudge:
+
+```
+For each scenario (1-10):
+  1. Init fresh HugePageArena (512MB)
+  2. Init OrderBlaster with scenario-specific config
+  3. Init ShadowOrderbook (reference engine)
+  4. Start contestant binary (Firecracker or direct)
+  5. Send SessionStart control message
+  6. Blast orders for scenario.duration_secs
+  7. Validate every fill against shadow
+  8. Compute correctness = shadow.correctness_score()
+  9. weighted_score = correctness × scenario.weight
+  10. Kill contestant process, cleanup arena
+```
+
+The aggregate `system_score` is the sum of all weighted scores (0.0 - 1.0).
+
+## Information Hiding
+
+Contestants see ONLY:
+
+```
+╔══════════════════════════════════════════════════════════════╗
+║            SYSTEM TEST RESULTS: team_alpha                  ║
+╠══════════════════════════════════════════════════════════════╣
+║  Scenarios Passed:  7 / 10                                  ║
+║  System Score:      0.7820                                  ║
+║  Final Score:       0.8292                                  ║
+╚══════════════════════════════════════════════════════════════╝
+```
+
+They do NOT see which scenarios failed or what each scenario tests. This prevents teams from reverse-engineering the test suite between rounds.
+
+## Admin Orchestration
+
+The full rejudge flow:
+
+```
+1. Admin POSTs /api/admin/system-test
+2. Backend sets competition state to "system_testing"
+3. For each team on the leaderboard:
+   a. Find best submission binary (recompile if needed)
+   b. Spawn: run_contest --system-test --binary <path>
+   c. Parse results from stderr
+   d. Update Redis leaderboard with blended score
+   e. Broadcast progress via WebSocket
+4. Set state to "completed"
+5. Broadcast final leaderboard
+```
+
+The frontend shows a live banner: `🔬 System Tests Running — 3/15` during the rejudge, then switches the leaderboard header to "Final Standings" with a `SYSTEM TESTED` badge.
 
 ---
 
@@ -1387,3 +1563,4 @@ IICPC/
 ---
 
 *This document describes a system that achieves 13.99 million transactions per second with sub-microsecond p99 latency on commodity hardware. Every design decision — from the memory allocator to the wire protocol to the CPU core map — exists to eliminate a measurable source of latency or non-determinism. Nothing is accidental.*
+

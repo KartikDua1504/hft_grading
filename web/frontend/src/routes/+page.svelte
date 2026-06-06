@@ -12,7 +12,9 @@
   let latencyCount = $state(0);
   let teamsCount = $state(0);
 
-  const quote = randomQuote();
+  const quoteObj = randomQuote();
+  const quote = quoteObj.text;
+  const author = quoteObj.author;
 
   onMount(() => {
     setTimeout(() => phase = 1, 300);
@@ -91,31 +93,42 @@
          style="top: 40%; animation: float 6s ease-in-out infinite;"></div>
   </div>
 
-  <!-- Floating orbs -->
-  <div class="absolute inset-0 overflow-hidden pointer-events-none {phase >= 2 ? 'opacity-100' : 'opacity-0'} transition-opacity duration-[3000ms]">
-    <div class="absolute w-[400px] h-[400px] rounded-full blur-[100px] opacity-[0.04]"
-         style="background: var(--accent); top: 15%; left: 10%; animation: float-slow 12s ease-in-out infinite;"></div>
-    <div class="absolute w-[300px] h-[300px] rounded-full blur-[80px] opacity-[0.03]"
-         style="background: var(--cyan); top: 55%; right: 15%; animation: float-slow 15s ease-in-out infinite 3s;"></div>
-    <div class="absolute w-[250px] h-[250px] rounded-full blur-[70px] opacity-[0.025]"
-         style="background: var(--violet); bottom: 10%; left: 40%; animation: float-slow 10s ease-in-out infinite 1s;"></div>
+  <!-- Orderbook Data Stream -->
+  <div class="absolute inset-0 overflow-hidden pointer-events-none {phase >= 2 ? 'opacity-100' : 'opacity-0'} transition-opacity duration-[3000ms] flex justify-between px-10">
+    <div class="flex flex-col gap-2 mt-20 opacity-30 flicker">
+      {#each Array(20) as _, i}
+        <div class="mono text-[10px] text-[var(--emerald)]" style="animation: slideDown {3 + Math.random() * 2}s linear infinite {Math.random()}s;">
+          BID {(10000 + Math.random() * 500).toFixed(2)} | {(Math.random() * 100).toFixed(0)} @ {(Math.random() * 10).toFixed(4)}s
+        </div>
+      {/each}
+    </div>
+    <div class="flex flex-col gap-2 mt-40 opacity-30 flicker">
+      {#each Array(20) as _, i}
+        <div class="mono text-[10px] text-[var(--rose)]" style="animation: slideDown {3 + Math.random() * 2}s linear infinite {Math.random()}s;">
+          ASK {(10500 + Math.random() * 500).toFixed(2)} | {(Math.random() * 100).toFixed(0)} @ {(Math.random() * 10).toFixed(4)}s
+        </div>
+      {/each}
+    </div>
   </div>
 
   <!-- Content -->
   <div class="relative z-10 flex flex-col items-center justify-center min-h-screen px-6">
     <div class="text-center transition-all duration-[1200ms] {phase >= 2 ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}">
-      <h1 class="text-7xl md:text-9xl font-black tracking-tighter leading-none select-none display text-gradient">
+      <h1 class="text-7xl md:text-9xl font-black tracking-tighter leading-none select-none display text-gradient glitch-hover">
         IICPC
       </h1>
       <div class="h-px w-24 mx-auto mt-4 bg-gradient-to-r from-transparent via-[var(--accent)] to-transparent
                   transition-all duration-1000 {phase >= 2 ? 'opacity-100 scale-x-100' : 'opacity-0 scale-x-0'}"></div>
     </div>
 
-    <div class="mt-8 h-8 flex items-center justify-center">
+    <div class="mt-8 h-12 flex flex-col items-center justify-center">
       {#if phase >= 3}
-        <p class="text-[var(--text-secondary)] text-sm md:text-base tracking-wide">
-          <span class="italic">{typedText}</span><span class="inline-block w-[2px] h-4 ml-0.5 bg-[var(--accent)] align-middle {showCursor ? 'opacity-100' : 'opacity-0'} transition-opacity"></span>
+        <p class="text-[var(--text-secondary)] text-sm md:text-base tracking-wide flex items-center">
+          <span class="italic">"{typedText}"</span><span class="inline-block w-[6px] h-4 ml-1 bg-[var(--accent)] align-middle {showCursor ? 'opacity-100' : 'opacity-0'} transition-opacity"></span>
         </p>
+      {/if}
+      {#if phase >= 4}
+        <p class="text-xs text-[var(--text-muted)] mono uppercase tracking-wider mt-2 fade-in">— {author}</p>
       {/if}
     </div>
 
@@ -252,17 +265,18 @@
         </p>
         <div class="mt-6 pt-4 border-t border-[var(--border)]">
           <div class="space-y-2">
-            {#each [['Correctness', '40%', 'var(--accent)'], ['Throughput', '30%', 'var(--cyan)'], ['Latency', '30%', 'var(--amber)']] as [label, pct, color]}
-              <div>
-                <div class="flex justify-between text-[10px] mb-1">
-                  <span class="text-[var(--text-muted)] uppercase tracking-wider">{label}</span>
-                  <span class="mono font-bold" style="color: {color};">{pct}</span>
-                </div>
-                <div class="h-1 rounded-full bg-[var(--bg-elevated)] overflow-hidden">
-                  <div class="h-full rounded-full" style="width: {pct}; background: {color}; opacity: 0.7;"></div>
-                </div>
-              </div>
-            {/each}
+            <div class="flex items-center gap-2">
+              <div class="w-1.5 h-1.5 rounded-full bg-[var(--accent)]"></div>
+              <span class="text-xs mono text-[var(--text-primary)]">Correctness Verification</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <div class="w-1.5 h-1.5 rounded-full bg-[var(--cyan)]"></div>
+              <span class="text-xs mono text-[var(--text-primary)]">Throughput Measurement</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <div class="w-1.5 h-1.5 rounded-full bg-[var(--amber)]"></div>
+              <span class="text-xs mono text-[var(--text-primary)]">Latency Profiling</span>
+            </div>
           </div>
         </div>
       </div>

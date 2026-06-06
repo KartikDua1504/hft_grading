@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
   import { auth } from '$lib/auth';
+  import { connectWS, onWSEvent, type WSEvent } from '$lib/ws';
 
   interface Entry {
     rank: number;
@@ -11,29 +12,18 @@
     correctness: number;
     p99: number;
     runs: number;
-    delta?: number; // rank change
+    delta?: number;
   }
 
   let entries = $state<Entry[]>([]);
   let team = $state('');
   let mounted = $state(false);
   let search = $state('');
-  let sortBy = $state<'score' | 'throughput' | 'correctness' | 'p99'>('score');
   let expandedTeam = $state<string | null>(null);
   let lastUpdate = $state('');
-
-  const DEMO: Entry[] = [
-    { rank: 1, team: 'quantum_traders', score: 0.924, throughput: 847293, correctness: 0.9847, p99: 1250, runs: 14, delta: 0 },
-    { rank: 2, team: 'zero_latency', score: 0.881, throughput: 723451, correctness: 0.9912, p99: 1890, runs: 9, delta: 1 },
-    { rank: 3, team: 'cache_lords', score: 0.853, throughput: 651002, correctness: 0.9734, p99: 2100, runs: 22, delta: -1 },
-    { rank: 4, team: 'lock_free_gang', score: 0.791, throughput: 534210, correctness: 0.9501, p99: 3400, runs: 7, delta: 2 },
-    { rank: 5, team: 'simd_warriors', score: 0.714, throughput: 412830, correctness: 0.9223, p99: 5600, runs: 31, delta: 0 },
-    { rank: 6, team: 'branch_predict', score: 0.682, throughput: 389100, correctness: 0.9102, p99: 6200, runs: 4, delta: -2 },
-    { rank: 7, team: 'page_fault_gang', score: 0.641, throughput: 342000, correctness: 0.8891, p99: 8400, runs: 18, delta: 0 },
-    { rank: 8, team: 'naive_alloc', score: 0.523, throughput: 214500, correctness: 0.8634, p99: 12300, runs: 2, delta: 1 },
-    { rank: 9, team: 'malloc_monkeys', score: 0.487, throughput: 189200, correctness: 0.8412, p99: 15000, runs: 6, delta: -1 },
-    { rank: 10, team: 'heap_overflow', score: 0.441, throughput: 156800, correctness: 0.8201, p99: 18500, runs: 3, delta: 0 },
-  ];
+  let loading = $state(true);
+  let systestState = $state('idle');
+  let systestNotif = $state('');
 
   onMount(() => {
     mounted = true;
@@ -44,12 +34,51 @@
     loadLeaderboard();
     lastUpdate = new Date().toLocaleTimeString('en-US', { hour12: false });
 
-    // Auto refresh
+    // WebSocket for live updates
+    connectWS();
+    const unsubWS = onWSEvent('leaderboard', (evt: WSEvent) => {
+      if (evt.data && Array.isArray(evt.data)) {
+        entries = evt.data.map((e: any, i: number) => ({
+          rank: i + 1, team: e.team_name, score: e.score,
+          throughput: e.throughput, correctness: e.correctness,
+          p99: e.p99_latency_ns, runs: e.submissions, delta: 0,
+        }));
+        lastUpdate = new Date().toLocaleTimeString('en-US', { hour12: false });
+      }
+    });
+
+    // System test events
+    const unsubSystest = onWSEvent('system_test', (evt: WSEvent) => {
+      if (evt.data) {
+        systestState = evt.data.state || systestState;
+        if (evt.data.state === 'completed') {
+          systestNotif = 'System tests complete — rankings updated';
+          loadLeaderboard();
+          setTimeout(() => { systestNotif = ''; }, 8000);
+        } else if (evt.data.state === 'running' && evt.data.current_team) {
+          systestNotif = `Testing: ${evt.data.current_team} (${evt.data.progress})`;
+        }
+      }
+    });
+
+    // Auto refresh every 30s as fallback
     const refresh = setInterval(() => {
-      lastUpdate = new Date().toLocaleTimeString('en-US', { hour12: false });
+      loadLeaderboard();
     }, 30000);
 
-    return () => { unsub(); clearInterval(refresh); };
+    // Poll systest status
+    async function pollSystest() {
+      try {
+        const res = await fetch('/api/system-test/status');
+        if (res.ok) {
+          const d = await res.json();
+          systestState = d.state;
+        }
+      } catch {}
+    }
+    pollSystest();
+
+    return () => { unsub(); unsubWS(); unsubSystest(); clearInterval(refresh); };
   });
 
   async function loadLeaderboard() {
@@ -57,17 +86,15 @@
       const res = await fetch('/api/leaderboard');
       if (res.ok) {
         const data = await res.json();
-        if (data.length > 0) {
-          entries = data.map((e: any, i: number) => ({
-            rank: i + 1, team: e.team_name, score: e.score,
-            throughput: e.throughput, correctness: e.correctness,
-            p99: e.p99_latency_ns, runs: e.submissions, delta: 0,
-          }));
-          return;
-        }
+        entries = data.map((e: any, i: number) => ({
+          rank: i + 1, team: e.team_name, score: e.score,
+          throughput: e.throughput, correctness: e.correctness,
+          p99: e.p99_latency_ns, runs: e.submissions, delta: 0,
+        }));
+        lastUpdate = new Date().toLocaleTimeString('en-US', { hour12: false });
       }
     } catch {}
-    entries = DEMO;
+    loading = false;
   }
 
   function filteredEntries(): Entry[] {
@@ -104,13 +131,6 @@
     return 'bg-rose-500';
   }
 
-  function medal(r: number): string {
-    if (r === 1) return '🥇';
-    if (r === 2) return '🥈';
-    if (r === 3) return '🥉';
-    return '';
-  }
-
   function podiumGradient(r: number): string {
     if (r === 1) return 'from-amber-500/10 to-amber-500/[0.02]';
     if (r === 2) return 'from-slate-400/10 to-slate-400/[0.02]';
@@ -136,18 +156,30 @@
 </svelte:head>
 
 {#if mounted}
-<div class="max-w-6xl mx-auto fade-in">
+<div class="w-full xl:max-w-[1400px] mx-auto px-6 fade-in">
   <!-- Header -->
-  <div class="flex items-end justify-between mb-8">
+  <div class="flex items-end justify-between mb-8 border-b border-[var(--border)] pb-4">
     <div>
-      <h1 class="text-3xl font-bold display tracking-tight mb-1">Rankings</h1>
-      <p class="text-sm text-[var(--text-secondary)]">{entries.length} teams competing · Updated {lastUpdate}</p>
+      <div class="flex items-center gap-2 mb-2">
+        <div class="w-2 h-2 rounded-full bg-[var(--accent)] flicker"></div>
+        <span class="text-[10px] mono uppercase tracking-widest text-[var(--accent)]">
+          {systestState === 'completed' ? 'Final Standings' : 'Live Rankings'}
+        </span>
+        {#if systestState === 'completed'}
+          <span class="text-[9px] px-2 py-0.5 rounded-full bg-violet-500/10 text-violet-300 mono font-bold">SYSTEM TESTED</span>
+        {/if}
+      </div>
+      <h1 class="text-3xl font-bold display tracking-tight mb-1 glitch-hover">Rankings</h1>
+      <p class="text-xs text-[var(--text-secondary)] mono">{entries.length} teams ranked · SYNC: {lastUpdate}</p>
+      {#if systestNotif}
+        <div class="mt-2 text-[11px] mono text-violet-300/80 animate-pulse">{systestNotif}</div>
+      {/if}
     </div>
-    <button class="btn btn-ghost text-xs gap-2" onclick={() => goto('/dashboard/submit')}>
+    <button class="btn btn-ghost text-xs gap-2 mono" onclick={() => goto('/dashboard/submit')}>
       <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"/>
       </svg>
-      Submit code
+      Deploy Engine
     </button>
   </div>
 
@@ -160,7 +192,7 @@
              style="background: rgba(148,163,184,0.1); color: rgb(148,163,184);">
           {entries[1].team.slice(0, 2).toUpperCase()}
         </div>
-        <div class="text-2xl mb-1">🥈</div>
+        <div class="text-[10px] text-[var(--text-ghost)] mono tracking-widest uppercase mb-1">Rank 02</div>
         <div class="text-sm font-semibold mono truncate">{entries[1].team}</div>
         <div class="text-2xl font-bold mono mt-2 {scoreColor(entries[1].score)}">{entries[1].score.toFixed(3)}</div>
         <div class="text-[10px] text-[var(--text-muted)] mt-1 mono">{fmt(entries[1].throughput)} ops · {latFmt(entries[1].p99)}</div>
@@ -168,7 +200,6 @@
 
       <!-- 1st Place -->
       <div class="card p-8 text-center bg-gradient-to-b {podiumGradient(1)} order-2 relative card-glow">
-        <!-- Crown glow -->
         <div class="absolute inset-0 pointer-events-none rounded-[var(--radius-lg)]"
              style="background: radial-gradient(circle at 50% 0%, rgba(251,191,36,0.06), transparent 60%);"></div>
         <div class="relative z-10">
@@ -176,11 +207,11 @@
                style="background: rgba(251,191,36,0.1); color: rgb(251,191,36);">
             {entries[0].team.slice(0, 2).toUpperCase()}
           </div>
-          <div class="text-3xl mb-1">🥇</div>
+          <div class="text-[10px] text-[var(--accent)] mono tracking-widest uppercase mb-1">Rank 01</div>
           <div class="text-base font-bold mono truncate">{entries[0].team}</div>
-          <div class="text-3xl font-black mono mt-2 {scoreColor(entries[0].score)}">{entries[0].score.toFixed(3)}</div>
+          <div class="text-3xl font-black mono mt-2 {scoreColor(entries[0].score)} glitch-hover">{entries[0].score.toFixed(3)}</div>
           <div class="text-[10px] text-[var(--text-muted)] mt-1 mono">{fmt(entries[0].throughput)} ops · {latFmt(entries[0].p99)}</div>
-          <div class="badge badge-emerald mt-3 mx-auto">{entries[0].runs} runs</div>
+          <div class="badge badge-emerald mt-3 mx-auto mono">{entries[0].runs} EXECS</div>
         </div>
       </div>
 
@@ -190,7 +221,7 @@
              style="background: rgba(180,83,9,0.1); color: rgb(180,83,9);">
           {entries[2].team.slice(0, 2).toUpperCase()}
         </div>
-        <div class="text-2xl mb-1">🥉</div>
+        <div class="text-[10px] text-[var(--text-ghost)] mono tracking-widest uppercase mb-1">Rank 03</div>
         <div class="text-sm font-semibold mono truncate">{entries[2].team}</div>
         <div class="text-2xl font-bold mono mt-2 {scoreColor(entries[2].score)}">{entries[2].score.toFixed(3)}</div>
         <div class="text-[10px] text-[var(--text-muted)] mt-1 mono">{fmt(entries[2].throughput)} ops · {latFmt(entries[2].p99)}</div>
@@ -205,24 +236,19 @@
         <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"/>
       </svg>
       <input
-        type="text"
-        bind:value={search}
-        class="input pl-10 !bg-[var(--bg-card)] text-sm"
+        class="input pl-10 mono"
         placeholder="Search teams..."
+        bind:value={search}
       />
-    </div>
-    <div class="flex items-center gap-1.5">
-      <div class="status-dot status-dot-online" style="width: 6px; height: 6px;"></div>
-      <span class="text-[10px] text-[var(--text-muted)]">Live</span>
     </div>
   </div>
 
-  <!-- Full Table -->
-  <div class="card overflow-hidden mb-8">
-    <table class="data-table">
+  <!-- Table -->
+  <div class="card p-0 overflow-hidden mb-8">
+    <table class="leaderboard-table">
       <thead>
         <tr>
-          <th class="w-16">#</th>
+          <th class="w-12">#</th>
           <th class="w-12"></th>
           <th>Team</th>
           <th class="text-right">Score</th>
@@ -234,13 +260,15 @@
         </tr>
       </thead>
       <tbody class="stagger">
-        {#each filteredEntries() as entry (entry.team)}
+        {#each filteredEntries() as entry, i (entry.team)}
           <tr
             class="{entry.team === team ? 'highlight' : ''} cursor-pointer"
             onclick={() => expandedTeam = expandedTeam === entry.team ? null : entry.team}
           >
             <td>
-              <span class="{entry.rank <= 3 ? 'text-lg' : 'mono text-[var(--text-muted)] text-sm'}">{entry.rank <= 3 ? medal(entry.rank) : entry.rank}</span>
+              <span class="{entry.rank <= 3 ? 'text-lg font-bold' : 'mono text-[var(--text-muted)] text-sm'}">
+                {entry.rank <= 3 ? '0' + entry.rank : entry.rank}
+              </span>
             </td>
             <td>
               <div class="w-7 h-7 rounded-md flex items-center justify-center text-[9px] font-bold mono"
@@ -256,66 +284,39 @@
                 <div class="w-16 h-1.5 rounded-full bg-[var(--bg-elevated)] overflow-hidden hidden sm:block">
                   <div class="h-full rounded-full {scoreBarColor(entry.score)} transition-all" style="width: {entry.score * 100}%"></div>
                 </div>
-                <span class="text-base font-bold mono {scoreColor(entry.score)}">{entry.score.toFixed(3)}</span>
+                <span class="mono font-bold text-sm {scoreColor(entry.score)}">{entry.score.toFixed(3)}</span>
               </div>
             </td>
-            <td class="text-right mono text-sm text-[var(--text-secondary)]">
-              {fmt(entry.throughput)}<span class="text-[var(--text-ghost)] text-xs ml-1">ops</span>
-            </td>
-            <td class="text-right mono text-sm {scoreColor(entry.correctness)}">
-              {(entry.correctness * 100).toFixed(1)}%
-            </td>
-            <td class="text-right mono text-sm text-[var(--text-secondary)]">
-              {latFmt(entry.p99)}
-            </td>
-            <td class="text-right mono text-sm text-[var(--text-muted)]">
-              {entry.runs}
-            </td>
+            <td class="text-right mono text-sm text-[var(--text-secondary)]">{fmt(entry.throughput)}<span class="text-[var(--text-ghost)] text-[10px] ml-0.5">ops</span></td>
+            <td class="text-right mono text-sm {entry.correctness >= 0.99 ? 'text-emerald-400' : entry.correctness >= 0.95 ? 'text-cyan-400' : 'text-amber-400'}">{(entry.correctness * 100).toFixed(1)}%</td>
+            <td class="text-right mono text-sm text-[var(--text-secondary)]">{latFmt(entry.p99)}</td>
+            <td class="text-right mono text-sm text-[var(--text-muted)]">{entry.runs}</td>
             <td class="text-right">
-              <span class="text-xs mono {deltaColor(entry.delta)}">{deltaIcon(entry.delta)}</span>
+              <span class="mono text-sm {deltaColor(entry.delta)}">{deltaIcon(entry.delta)}</span>
             </td>
           </tr>
-
-          <!-- Expanded Detail -->
+          <!-- Expanded detail -->
           {#if expandedTeam === entry.team}
-            <tr>
-              <td colspan="9" class="!p-0">
-                <div class="px-6 py-5 bg-[var(--bg-surface)] border-y border-[var(--border)] fade-in">
-                  <div class="grid grid-cols-4 gap-6">
-                    <div>
-                      <div class="text-[10px] text-[var(--text-muted)] uppercase tracking-wider mb-1">Throughput</div>
-                      <div class="text-lg font-bold mono">{fmt(entry.throughput)}</div>
-                      <div class="text-[10px] text-[var(--text-ghost)] mono">orders/sec</div>
-                    </div>
-                    <div>
-                      <div class="text-[10px] text-[var(--text-muted)] uppercase tracking-wider mb-1">Correctness</div>
-                      <div class="text-lg font-bold mono {scoreColor(entry.correctness)}">{(entry.correctness * 100).toFixed(2)}%</div>
-                      <div class="text-[10px] text-[var(--text-ghost)] mono">FIFO validated</div>
-                    </div>
-                    <div>
-                      <div class="text-[10px] text-[var(--text-muted)] uppercase tracking-wider mb-1">Tail Latency</div>
-                      <div class="text-lg font-bold mono">{latFmt(entry.p99)}</div>
-                      <div class="text-[10px] text-[var(--text-ghost)] mono">p99 round-trip</div>
-                    </div>
-                    <div>
-                      <div class="text-[10px] text-[var(--text-muted)] uppercase tracking-wider mb-1">Submissions</div>
-                      <div class="text-lg font-bold mono">{entry.runs}</div>
-                      <div class="text-[10px] text-[var(--text-ghost)] mono">total runs</div>
-                    </div>
+            <tr class="expanded-row">
+              <td colspan="9">
+                <div class="p-6 grid grid-cols-4 gap-6 border-t border-[var(--border-subtle)]">
+                  <div>
+                    <div class="text-[10px] text-[var(--text-muted)] uppercase tracking-wider mb-1">Score</div>
+                    <div class="text-lg font-bold mono {scoreColor(entry.score)}">{entry.score.toFixed(4)}</div>
                   </div>
-
-                  <!-- Score breakdown bar -->
-                  <div class="mt-5">
-                    <div class="flex gap-1 h-2 rounded-full overflow-hidden">
-                      <div class="rounded-l-full" style="width: 40%; background: var(--accent); opacity: {entry.correctness}"></div>
-                      <div style="width: 30%; background: var(--cyan); opacity: {entry.throughput / 1000000}"></div>
-                      <div class="rounded-r-full" style="width: 30%; background: var(--amber); opacity: {1 - entry.p99 / 20000}"></div>
-                    </div>
-                    <div class="flex justify-between mt-2 text-[9px] text-[var(--text-ghost)] uppercase tracking-wider">
-                      <span>Correctness 40%</span>
-                      <span>Throughput 30%</span>
-                      <span>Latency 30%</span>
-                    </div>
+                  <div>
+                    <div class="text-[10px] text-[var(--text-muted)] uppercase tracking-wider mb-1">Throughput</div>
+                    <div class="text-lg font-bold mono">{fmt(entry.throughput)} ops/s</div>
+                  </div>
+                  <div>
+                    <div class="text-[10px] text-[var(--text-muted)] uppercase tracking-wider mb-1">Tail Latency</div>
+                    <div class="text-lg font-bold mono">{latFmt(entry.p99)}</div>
+                    <div class="text-[10px] text-[var(--text-ghost)] mono">p99 round-trip</div>
+                  </div>
+                  <div>
+                    <div class="text-[10px] text-[var(--text-muted)] uppercase tracking-wider mb-1">Submissions</div>
+                    <div class="text-lg font-bold mono">{entry.runs}</div>
+                    <div class="text-[10px] text-[var(--text-ghost)] mono">total runs</div>
                   </div>
                 </div>
               </td>
@@ -325,7 +326,11 @@
       </tbody>
     </table>
 
-    {#if filteredEntries().length === 0}
+    {#if loading}
+      <div class="px-6 py-16 text-center">
+        <div class="text-[var(--text-muted)]">Loading rankings...</div>
+      </div>
+    {:else if filteredEntries().length === 0}
       <div class="px-6 py-16 text-center">
         {#if search}
           <div class="text-[var(--text-muted)] mb-2">No teams matching "{search}"</div>
@@ -336,52 +341,6 @@
         {/if}
       </div>
     {/if}
-  </div>
-
-  <!-- Scoring Legend -->
-  <div class="grid md:grid-cols-3 gap-4 stagger">
-    <div class="card p-6 group">
-      <div class="flex items-center gap-3 mb-3">
-        <div class="w-8 h-8 rounded-lg flex items-center justify-center" style="background: var(--accent-glow);">
-          <svg class="w-4 h-4 text-[var(--accent)]" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-          </svg>
-        </div>
-        <div class="text-2xl font-black display" style="color: var(--accent);">40%</div>
-      </div>
-      <h3 class="text-xs font-bold uppercase tracking-wider text-[var(--text-secondary)] mb-1.5">Correctness</h3>
-      <p class="text-xs text-[var(--text-muted)] leading-relaxed">
-        Every fill validated against a deterministic reference model for FIFO price-time priority.
-      </p>
-    </div>
-    <div class="card p-6 group">
-      <div class="flex items-center gap-3 mb-3">
-        <div class="w-8 h-8 rounded-lg flex items-center justify-center" style="background: var(--cyan-dim);">
-          <svg class="w-4 h-4 text-[var(--cyan)]" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z"/>
-          </svg>
-        </div>
-        <div class="text-2xl font-black display text-[var(--cyan)]">30%</div>
-      </div>
-      <h3 class="text-xs font-bold uppercase tracking-wider text-[var(--text-secondary)] mb-1.5">Throughput</h3>
-      <p class="text-xs text-[var(--text-muted)] leading-relaxed">
-        Orders processed per second under sustained 30-second load. Zero drops required.
-      </p>
-    </div>
-    <div class="card p-6 group">
-      <div class="flex items-center gap-3 mb-3">
-        <div class="w-8 h-8 rounded-lg flex items-center justify-center" style="background: var(--amber-dim);">
-          <svg class="w-4 h-4 text-[var(--amber)]" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z"/>
-          </svg>
-        </div>
-        <div class="text-2xl font-black display text-[var(--amber)]">30%</div>
-      </div>
-      <h3 class="text-xs font-bold uppercase tracking-wider text-[var(--text-secondary)] mb-1.5">Latency</h3>
-      <p class="text-xs text-[var(--text-muted)] leading-relaxed">
-        99th percentile round-trip response time. Measured at wire boundary. Lower is better.
-      </p>
-    </div>
   </div>
 </div>
 {/if}

@@ -1,0 +1,12 @@
+=== Arena Allocator Benchmark ===
+
+[tsc] Calibrated: 2.688 GHz (0.372 ns/tick, measured over 100 ms)
+[arena] Allocated 256 MiB with 2MB huge pages at 0x7fb48be00000
+[test] Hugepage backed: YES
+[test] Arena capacity: 256 MiB
+[test] All 1000 allocations 64-byte aligned: PASS
+[test] Allocation throughput: 0.3 ns/alloc (1000000 allocations)
+[test] Arena used: 64000000 / 268435456 bytes (23.8%)
+[test] Reset speed: 0.0 ns/reset
+
+=== Arena Benchmark Complete ===

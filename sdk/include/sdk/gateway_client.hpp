@@ -1,12 +1,17 @@
 #pragma once
 // =============================================================================
-// gateway_client.hpp — VM-Side Gateway Client (runs inside Firecracker)
+// gateway_client.hpp — Engine Client (runs contestant's orderbook)
 // =============================================================================
-// Lightweight Unix-domain-socket client. Connects to the host gateway,
-// receives market data + execution reports, sends orders + cancels.
+// Connects to the host platform via Unix domain socket.
+// Receives OrderEntry and CancelRequest messages from the order blaster.
+// Calls the contestant's IStrategy::on_order / on_cancel.
+// Sends back ContestantResponse structs for scoring.
 //
-// This runs INSIDE the contestant VM. Linked into the strategy binary.
-// Uses non-blocking poll loop — no threads, no heap, no bloat.
+// High-performance design:
+//   - 64KB receive buffer (batch reads)
+//   - Response batching (flush every 64 responses or on buffer drain)
+//   - Proper message framing using msg_size() lookup
+//   - Non-blocking response sends with MSG_NOSIGNAL
 // =============================================================================
 
 #include "sdk/protocol.hpp"
@@ -18,73 +23,43 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <unistd.h>
-#include <poll.h>
 
 namespace iicpc {
 
 // =============================================================================
-// Position & PnL Tracker (runs inside VM, updated on fills)
+// Response sender implementation — batches responses for throughput
 // =============================================================================
-struct PositionTracker {
-    int32_t  position      = 0;
-    int64_t  realized_pnl  = 0;
-    int64_t  avg_entry_price = 0; // Volume-weighted average entry (scaled)
-    int64_t  total_cost    = 0;   // Total cost basis
-    int64_t  last_mid      = 0;   // Last mid price for mark-to-market
-    uint32_t next_client_id = 1;
+class SocketResponseSender final : public IResponseSender {
+public:
+    explicit SocketResponseSender(int fd) noexcept : fd_(fd) {}
 
-    void on_fill(const Fill& fill) noexcept {
-        int32_t signed_qty = (fill.side == Side::BUY) ? fill.fill_qty : -fill.fill_qty;
-
-        // Closing position
-        if ((position > 0 && signed_qty < 0) || (position < 0 && signed_qty > 0)) {
-            int32_t close_qty = (signed_qty > 0)
-                ? ((signed_qty < -position) ? signed_qty : -position)
-                : ((signed_qty > -position) ? signed_qty : -position);
-
-            if (position > 0) { // Was long, selling
-                realized_pnl += static_cast<int64_t>(close_qty) *
-                    (avg_entry_price - fill.fill_price) * -1;
-            } else { // Was short, buying
-                realized_pnl += static_cast<int64_t>(-close_qty) *
-                    (fill.fill_price - avg_entry_price) * -1;
-            }
+    bool send(const ContestantResponse& resp) noexcept override {
+        batch_[count_++] = resp;
+        if (count_ >= BATCH_SIZE) {
+            return flush();
         }
-
-        // Opening/extending position
-        if ((position >= 0 && signed_qty > 0) || (position <= 0 && signed_qty < 0)) {
-            int64_t old_cost = avg_entry_price * static_cast<int64_t>(
-                (position >= 0) ? position : -position);
-            int64_t new_cost = fill.fill_price * static_cast<int64_t>(
-                (signed_qty >= 0) ? signed_qty : -signed_qty);
-            int32_t new_total = (position >= 0 ? position : -position) +
-                                (signed_qty >= 0 ? signed_qty : -signed_qty);
-            if (new_total > 0) {
-                avg_entry_price = (old_cost + new_cost) / new_total;
-            }
-        }
-
-        position += signed_qty;
+        return true;
     }
 
-    [[nodiscard]] int64_t unrealized_pnl() const noexcept {
-        if (position == 0 || last_mid == 0) return 0;
-        if (position > 0) {
-            return static_cast<int64_t>(position) * (last_mid - avg_entry_price);
-        } else {
-            return static_cast<int64_t>(-position) * (avg_entry_price - last_mid);
-        }
+    bool flush() noexcept {
+        if (count_ == 0) return true;
+        ssize_t total = static_cast<ssize_t>(sizeof(ContestantResponse) * count_);
+        ssize_t sent = ::send(fd_, batch_, total, MSG_NOSIGNAL);
+        count_ = 0;
+        return sent == total;
     }
 
-    [[nodiscard]] int64_t total_pnl() const noexcept {
-        return realized_pnl + unrealized_pnl();
-    }
+private:
+    static constexpr uint32_t BATCH_SIZE = 64;
+    int fd_;
+    ContestantResponse batch_[BATCH_SIZE] = {};
+    uint32_t count_ = 0;
 };
 
 // =============================================================================
-// Gateway Client — IOrderGateway implementation over Unix socket
+// Engine Client — connects to platform, drives contestant's orderbook
 // =============================================================================
-class GatewayClient final : public IOrderGateway {
+class GatewayClient {
 public:
     GatewayClient() noexcept = default;
     ~GatewayClient() noexcept { disconnect(); }
@@ -92,7 +67,7 @@ public:
     [[nodiscard]] bool connect(const char* socket_path) noexcept {
         fd_ = ::socket(AF_UNIX, SOCK_STREAM, 0);
         if (fd_ < 0) {
-            std::fprintf(stderr, "[gateway_client] socket() failed: %s\n",
+            std::fprintf(stderr, "[engine] socket() failed: %s\n",
                          std::strerror(errno));
             return false;
         }
@@ -103,12 +78,17 @@ public:
 
         if (::connect(fd_, reinterpret_cast<struct sockaddr*>(&addr),
                       sizeof(addr)) < 0) {
-            std::fprintf(stderr, "[gateway_client] connect(%s) failed: %s\n",
+            std::fprintf(stderr, "[engine] connect(%s) failed: %s\n",
                          socket_path, std::strerror(errno));
             ::close(fd_);
             fd_ = -1;
             return false;
         }
+
+        // Enlarge recv buffer for high-throughput reads
+        int bufsize = 1 << 20; // 1MB
+        ::setsockopt(fd_, SOL_SOCKET, SO_RCVBUF, &bufsize, sizeof(bufsize));
+        ::setsockopt(fd_, SOL_SOCKET, SO_SNDBUF, &bufsize, sizeof(bufsize));
 
         return true;
     }
@@ -118,135 +98,107 @@ public:
     }
 
     // =========================================================================
-    // Main event loop — drives the strategy
+    // Main event loop — drives the contestant's orderbook engine
     // =========================================================================
     void run(IStrategy& strategy) noexcept {
         if (fd_ < 0) return;
 
-        // Aligned receive buffer (largest message = 64 bytes)
-        alignas(64) uint8_t buf[256];
+        SocketResponseSender sender(fd_);
 
-        struct pollfd pfd{};
-        pfd.fd = fd_;
-        pfd.events = POLLIN;
+        // Large receive buffer for batch processing
+        static constexpr size_t BUF_SIZE = 65536;
+        alignas(64) uint8_t buf[BUF_SIZE];
+        size_t buf_used = 0;
 
-        bool session_active = false;
+        uint64_t orders_processed = 0;
+        uint64_t cancels_processed = 0;
 
         while (true) {
-            int ret = ::poll(&pfd, 1, 1000); // 1s timeout for heartbeat
-            if (ret < 0) {
-                if (errno == EINTR) continue;
-                break;
+            // Read as much data as possible
+            ssize_t n = ::recv(fd_, buf + buf_used, BUF_SIZE - buf_used, 0);
+            if (n <= 0) break; // Disconnected or error
+            buf_used += static_cast<size_t>(n);
+
+            // Process all complete messages in the buffer
+            size_t offset = 0;
+            while (offset < buf_used) {
+                // Need at least 1 byte for message type
+                if (offset >= buf_used) break;
+
+                MsgType type = peek_msg_type(buf + offset);
+                uint32_t msize = msg_size(type);
+
+                // Unknown message type or not enough data for complete message
+                if (msize == 0 || offset + msize > buf_used) break;
+
+                switch (type) {
+                    case MsgType::SESSION_START: {
+                        auto& msg = *reinterpret_cast<SessionStart*>(buf + offset);
+                        strategy.on_session_start(msg);
+                        std::fprintf(stderr, "[engine] Session started: "
+                                     "duration=%ums instruments=%u\n",
+                                     msg.match_duration_ms, msg.instrument_count);
+                        break;
+                    }
+
+                    case MsgType::ORDER_ENTRY: {
+                        auto& msg = *reinterpret_cast<OrderEntry*>(buf + offset);
+                        strategy.on_order(msg, sender);
+                        orders_processed++;
+                        break;
+                    }
+
+                    case MsgType::CANCEL_REQUEST: {
+                        auto& msg = *reinterpret_cast<CancelRequest*>(buf + offset);
+                        strategy.on_cancel(msg, sender);
+                        cancels_processed++;
+                        break;
+                    }
+
+                    case MsgType::SESSION_END: {
+                        sender.flush();
+                        auto& msg = *reinterpret_cast<SessionEnd*>(buf + offset);
+                        strategy.on_session_end(msg);
+                        std::fprintf(stderr, "[engine] Session ended: "
+                                     "orders=%lu cancels=%lu\n",
+                                     orders_processed, cancels_processed);
+                        return;
+                    }
+
+                    case MsgType::HEARTBEAT:
+                        break;
+
+                    default:
+                        // Unknown message — skip
+                        std::fprintf(stderr, "[engine] Unknown msg type: %u\n",
+                                     static_cast<unsigned>(type));
+                        break;
+                }
+
+                offset += msize;
             }
 
-            if (ret == 0) {
-                // Timeout — send heartbeat
-                Heartbeat hb{};
-                hb.msg_type = MsgType::HEARTBEAT;
-                hb.sequence = tracker_.next_client_id;
-                send_raw(&hb, sizeof(hb));
-                continue;
-            }
+            // Flush any pending responses after processing this batch
+            sender.flush();
 
-            // Read message
-            ssize_t n = ::recv(fd_, buf, sizeof(buf), 0);
-            if (n <= 0) break; // Disconnected
-
-            // Dispatch based on message type
-            MsgType type = peek_msg_type(buf);
-
-            switch (type) {
-                case MsgType::SESSION_START: {
-                    auto& msg = *reinterpret_cast<SessionStart*>(buf);
-                    strategy.on_session_start(*this, msg);
-                    session_active = true;
-                    break;
-                }
-                case MsgType::MARKET_UPDATE: {
-                    auto& msg = *reinterpret_cast<MarketUpdate*>(buf);
-                    tracker_.last_mid = (msg.best_bid_price + msg.best_ask_price) / 2;
-                    strategy.on_market_data(msg);
-                    break;
-                }
-                case MsgType::ORDER_ACK: {
-                    auto& msg = *reinterpret_cast<OrderAck*>(buf);
-                    strategy.on_order_ack(msg);
-                    break;
-                }
-                case MsgType::FILL: {
-                    auto& msg = *reinterpret_cast<Fill*>(buf);
-                    tracker_.on_fill(msg);
-                    strategy.on_fill(msg);
-                    break;
-                }
-                case MsgType::CANCEL_ACK: {
-                    auto& msg = *reinterpret_cast<CancelAck*>(buf);
-                    strategy.on_cancel_ack(msg);
-                    break;
-                }
-                case MsgType::SESSION_END: {
-                    auto& msg = *reinterpret_cast<SessionEnd*>(buf);
-                    strategy.on_session_end(msg);
-                    session_active = false;
-                    return; // Match is over
-                }
-                case MsgType::HEARTBEAT:
-                    break; // Just keep alive
-                default:
-                    break;
+            // Move unprocessed bytes to start of buffer
+            if (offset > 0 && offset < buf_used) {
+                std::memmove(buf, buf + offset, buf_used - offset);
+                buf_used -= offset;
+            } else if (offset >= buf_used) {
+                buf_used = 0;
             }
         }
 
-        // If we reach here without SESSION_END, something went wrong
-        if (session_active) {
-            SessionEnd end{};
-            end.msg_type = MsgType::SESSION_END;
-            end.final_pnl = tracker_.total_pnl();
-            end.final_position = tracker_.position;
-            strategy.on_session_end(end);
-        }
-    }
-
-    // =========================================================================
-    // IOrderGateway implementation
-    // =========================================================================
-    [[nodiscard]] bool send_order(const OrderEntry& order) noexcept override {
-        return send_raw(&order, sizeof(order));
-    }
-
-    [[nodiscard]] bool send_cancel(const CancelRequest& cancel) noexcept override {
-        return send_raw(&cancel, sizeof(cancel));
-    }
-
-    [[nodiscard]] int32_t position() const noexcept override {
-        return tracker_.position;
-    }
-
-    [[nodiscard]] int64_t unrealized_pnl() const noexcept override {
-        return tracker_.unrealized_pnl();
-    }
-
-    [[nodiscard]] int64_t realized_pnl() const noexcept override {
-        return tracker_.realized_pnl;
-    }
-
-    [[nodiscard]] int64_t total_pnl() const noexcept override {
-        return tracker_.total_pnl();
-    }
-
-    [[nodiscard]] uint32_t next_order_id() noexcept override {
-        return tracker_.next_client_id++;
+        // Connection closed without SESSION_END
+        sender.flush();
+        std::fprintf(stderr, "[engine] Connection closed: "
+                     "orders=%lu cancels=%lu\n",
+                     orders_processed, cancels_processed);
     }
 
 private:
-    bool send_raw(const void* data, std::size_t len) noexcept {
-        if (fd_ < 0) return false;
-        ssize_t sent = ::send(fd_, data, len, MSG_NOSIGNAL);
-        return sent == static_cast<ssize_t>(len);
-    }
-
     int fd_ = -1;
-    PositionTracker tracker_;
 };
 
 } // namespace iicpc

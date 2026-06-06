@@ -176,6 +176,71 @@ public:
         return recv_responses(fleet, ring);
     }
 
+    /// Tight interleaved send/recv — reduces function call overhead
+    /// and improves cache utilization by keeping both paths warm.
+    IICPC_HOT IICPC_FLATTEN
+    std::size_t run_batch_tight(BotFleet& fleet, TelemetryRing& ring) noexcept {
+        std::size_t total_recvs_batch = 0;
+
+        // Interleave: for each bot, try send then try recv
+        // This keeps both channel caches warm simultaneously
+        for (std::size_t i = 0; i < fleet.count; ++i) {
+            // Prefetch next bot's state
+            if (IICPC_LIKELY(i + 4 < fleet.count)) {
+                prefetch_read_l1(&fleet.states[i + 4]);
+            }
+
+            // Try send
+            if (fleet.states[i] == BotState::IDLE) {
+                const uint64_t tsc_now = rdtsc();
+                const uint32_t seq = next_seq_++;
+
+                ShmRequest req;
+                req.bot_id   = fleet.bot_ids[i];
+                req.seq_num  = seq;
+                req.send_tsc = tsc_now;
+                req.valid    = 1;
+
+                if (IICPC_LIKELY(req_chan_->try_push(req))) {
+                    fleet.send_tsc[i] = tsc_now;
+                    fleet.sequence_nums[i] = seq;
+                    fleet.states[i] = BotState::WAITING;
+                    total_sends_++;
+                }
+            }
+
+            // Try recv (drain one response per iteration to stay balanced)
+            ShmResponse resp;
+            if (resp_chan_->try_pop(resp)) {
+                const uint64_t recv_tsc = rdtsc();
+                const std::size_t bot_idx = resp.bot_id;
+
+                if (IICPC_LIKELY(bot_idx < fleet.count)) {
+                    // Write-prefetch the state we're about to modify
+                    prefetch_write_l1(&fleet.states[bot_idx]);
+
+                    fleet.recv_tsc[bot_idx] = recv_tsc;
+                    fleet.states[bot_idx] = BotState::IDLE;
+
+                    const LatencySample sample{
+                        .send_tsc = resp.send_tsc,
+                        .recv_tsc = recv_tsc,
+                        .bot_id   = static_cast<uint32_t>(bot_idx),
+                        .seq_num  = resp.seq_num,
+                    };
+                    (void)ring.try_push(sample);
+                }
+
+                total_recvs_++;
+                total_recvs_batch++;
+            }
+        }
+
+        // Final drain pass for any remaining responses
+        total_recvs_batch += recv_responses(fleet, ring);
+        return total_recvs_batch;
+    }
+
     [[nodiscard]] uint64_t total_sends() const noexcept { return total_sends_; }
     [[nodiscard]] uint64_t total_recvs() const noexcept { return total_recvs_; }
 
@@ -183,9 +248,10 @@ private:
     IICPC_HOT
     void send_requests(BotFleet& fleet) noexcept {
         for (std::size_t i = 0; i < fleet.count; ++i) {
-            // Prefetch
-            if (IICPC_LIKELY(i + 8 < fleet.count)) {
-                prefetch_read_l1(&fleet.states[i + 8]);
+            // Tighter prefetch: 4 ahead for L1 hit rate (64 bytes × 4 = 256 bytes)
+            if (IICPC_LIKELY(i + 4 < fleet.count)) {
+                prefetch_read_l1(&fleet.states[i + 4]);
+                prefetch_read_l1(&fleet.bot_ids[i + 4]);
             }
 
             if (IICPC_UNLIKELY(fleet.states[i] != BotState::IDLE)) continue;
@@ -218,6 +284,10 @@ private:
             const std::size_t bot_idx = resp.bot_id;
 
             if (IICPC_LIKELY(bot_idx < fleet.count)) {
+                // Write-prefetch: we're about to write fleet state + tsc arrays
+                prefetch_write_l1(&fleet.states[bot_idx]);
+                prefetch_write_l1(&fleet.recv_tsc[bot_idx]);
+
                 fleet.recv_tsc[bot_idx] = recv_tsc;
                 fleet.states[bot_idx] = BotState::IDLE;
 

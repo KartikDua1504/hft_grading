@@ -1,0 +1,33 @@
+
+╔══════════════════════════════════════════════════════════╗
+║   IICPC Order Blaster Benchmark                         ║
+║   The Firehose — Deterministic Order Generation          ║
+╚══════════════════════════════════════════════════════════╝
+
+[arena] Allocated 128 MiB with 2MB huge pages at 0x7f9a2ce00000
+[spinlock] TicketSpinlock: 9.5 ns/lock-unlock cycle (uncontended)
+[seqlock]  SeqLock: 0.5 ns/write cycle
+
+[blaster] Running 5-second generation benchmark...
+
+[blaster] t=1s | orders=9818256 | TPS=9818225 | limits=3276319 markets=3269713 cancels=3272224
+[blaster] t=2s | orders=19717521 | TPS=9858721 | limits=6575526 markets=6570565 cancels=6571430
+[blaster] t=3s | orders=29669076 | TPS=9889675 | limits=9893106 markets=9886958 cancels=9889012
+[blaster] t=4s | orders=39572640 | TPS=9893152 | limits=13193777 markets=13189182 cancels=13189681
+[blaster] t=5s | orders=49580090 | TPS=9916000 | limits=16530126 markets=16523934 cancels=16526030
+
+╔══════════════════════════════════════════════════════════════╗
+║              ORDER BLASTER RESULTS                          ║
+╠══════════════════════════════════════════════════════════════╣
+║  Duration:     5.00 seconds                                ║
+║  Total Orders: 49580090                                      ║
+║  Throughput:   9915978                                  OPS  ║
+║  Limits:       16530126                                      ║
+║  Markets:      16523934                                      ║
+║  Cancels:      16526030                                      ║
+╠══════════════════════════════════════════════════════════════╣
+║  TicketSpinlock: 0.0 ns/cycle (uncontended)               ║
+║  [✓] Deterministic (seed=12345)                            ║
+║  [✓] Zero heap allocation                                 ║
+║  [✓] Lock-free ring buffer                                ║
+╚══════════════════════════════════════════════════════════════╝

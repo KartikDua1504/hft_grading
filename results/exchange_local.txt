@@ -1,0 +1,30 @@
+
+╔══════════════════════════════════════════════════════════╗
+║   IICPC Local Exchange                                  ║
+║   Matching Engine + Gateway + Strategy Test              ║
+╚══════════════════════════════════════════════════════════╝
+
+[arena] Allocated 256 MiB with 2MB huge pages at 0x7ff735000000
+[exchange] Contestant registered (id=0)
+[exchange] No strategy binary. Running passive.
+[exchange] t=1s | ticks=1001 | orders=0 | fills=0 | pos=0 | PnL=0
+[exchange] t=2s | ticks=2000 | orders=0 | fills=0 | pos=0 | PnL=0
+[exchange] t=3s | ticks=3000 | orders=0 | fills=0 | pos=0 | PnL=0
+[exchange] t=4s | ticks=4001 | orders=0 | fills=0 | pos=0 | PnL=0
+[exchange] t=5s | ticks=5001 | orders=0 | fills=0 | pos=0 | PnL=0
+[exchange] t=6s | ticks=6001 | orders=0 | fills=0 | pos=0 | PnL=0
+[exchange] t=7s | ticks=7001 | orders=0 | fills=0 | pos=0 | PnL=0
+[exchange] t=8s | ticks=8001 | orders=0 | fills=0 | pos=0 | PnL=0
+[exchange] t=9s | ticks=9000 | orders=0 | fills=0 | pos=0 | PnL=0
+
+╔══════════════════════════════════════════════════════════════╗
+║                 MATCH RESULTS                               ║
+╠══════════════════════════════════════════════════════════════╣
+║  Duration:     30 seconds                                   ║
+║  Ticks:        9987                                          ║
+║  Orders:       0                                             ║
+║  Fills:        0                                             ║
+║  Position:     0                                             ║
+║  Realized PnL: $0.00                                        ║
+║  Total PnL:    $0.00                                        ║
+╚══════════════════════════════════════════════════════════════╝

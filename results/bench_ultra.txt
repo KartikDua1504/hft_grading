@@ -1,0 +1,56 @@
+
+╔══════════════════════════════════════════════════╗
+║   ULTRA-LOW-LATENCY BENCHMARK                   ║
+║   Target: <5µs p50, >1M TPS                     ║
+╚══════════════════════════════════════════════════╝
+
+[arena] Allocated 1024 MiB with 2MB huge pages at 0x7f5138600000
+[tsc] Calibrated: 2.688 GHz (0.372 ns/tick, measured over 100 ms)
+[exchange-ultra] Listening on Unix: /tmp/iicpc_ultra.sock
+[bench] Initializing 100 bots...
+[payload_gen] Pre-generated 100 payloads (64 bytes each)
+[ultra] Connected 100/100 bots (Unix domain)
+
+[bench] === BENCHMARK START (5 seconds) ===
+
+[telemetry] Consumer started (report every 1000 ms)
+[telemetry] TPS=904421  total=904421  dropped=0  p50=99.8us  p90=114.2us  p99=128.0us  p999=185.3us  max=310.3us
+[telemetry] TPS=938115  total=1842536  dropped=0  p50=97.8us  p90=112.1us  p99=123.9us  p999=184.3us  max=342.1us
+[telemetry] TPS=912615  total=2755151  dropped=0  p50=98.3us  p90=112.6us  p99=122.9us  p999=181.2us  max=342.1us
+[telemetry] TPS=936036  total=3691187  dropped=0  p50=97.8us  p90=112.1us  p99=121.9us  p999=178.2us  max=342.1us
+
+[bench] Draining...
+[telemetry] TPS=916808  total=4607995  dropped=0  p50=97.8us  p90=112.1us  p99=122.9us  p999=184.3us  max=342.1us
+
+[telemetry] === FINAL REPORT ===
+[telemetry] Total samples: 4608031
+[telemetry] Max seq seen: 4608030
+[telemetry] Computed drops: 0
+[hdr] samples=4608031  min=14.5us  p50=97.8us  p90=112.1us  p99=122.9us  p999=184.3us  max=342.1us
+
+╔══════════════════════════════════════════════════════════════╗
+║               ULTRA BENCHMARK RESULTS                       ║
+╠══════════════════════════════════════════════════════════════╣
+║  Duration:     5.00 seconds                                ║
+║  Transport:    Unix Domain Socket (kernel bypass)            ║
+║  Bots:         100                                           ║
+║                                                              ║
+║  Total Sends:  4608031                                       ║
+║  Total Recvs:  4608031                                       ║
+║  Drops:        0                                             ║
+║  TPS:          921602                                        ║
+║                                                              ║
+║  Latency:                                                    ║
+║    p50:         97.8 µs                                       ║
+║    p90:        112.1 µs                                       ║
+║    p99:        122.9 µs                                       ║
+║    p999:       184.3 µs                                       ║
+║    max:        342.1 µs                                       ║
+║                                                              ║
+║  [✓] TPS ≥ 100k                                          ║
+║  [✗] TPS ≥ 1M                                             ║
+║  [✓] Zero drops                                           ║
+║  [✗] p50 < 5µs (HFT-tier)                                ║
+║  [✗] p50 < 50µs (exchange-tier)                           ║
+║  [✗] p99 < 100µs (deterministic)                          ║
+╚══════════════════════════════════════════════════════════════╝

@@ -1,0 +1,68 @@
+
+╔══════════════════════════════════════════════════════════╗
+║   IICPC Order Blaster Benchmark                         ║
+║   The Firehose — Deterministic Order Generation          ║
+╚══════════════════════════════════════════════════════════╝
+
+[arena] Allocated 128 MiB with 2MB huge pages at 0x7fc7f9200000
+[spinlock] TicketSpinlock: 8.6 ns/lock-unlock cycle (uncontended)
+[seqlock]  SeqLock: 0.5 ns/write cycle
+
+[blaster] Running 3-second generation benchmark...
+
+[blaster] t=1s | orders=9427749 | TPS=9427640 | limits=3146303 markets=3139239 cancels=3142207
+[blaster] t=2s | orders=19234530 | TPS=9617195 | limits=6414636 markets=6409353 cancels=6410541
+[blaster] t=3s | orders=29159275 | TPS=9719751 | limits=9722854 markets=9717663 cancels=9718758
+
+╔══════════════════════════════════════════════════════════════╗
+║              ORDER BLASTER RESULTS                          ║
+╠══════════════════════════════════════════════════════════════╣
+║  Duration:     3.00 seconds                                ║
+║  Total Orders: 29159275                                      ║
+║  Throughput:   9719722                                  OPS  ║
+║  Limits:       9722854                                       ║
+║  Markets:      9717663                                       ║
+║  Cancels:      9718758                                       ║
+╠══════════════════════════════════════════════════════════════╣
+║  TicketSpinlock: 0.0 ns/cycle (uncontended)               ║
+║  [✓] Deterministic (seed=12345)                            ║
+║  [✓] Zero heap allocation                                 ║
+║  [✓] Lock-free ring buffer                                ║
+╚══════════════════════════════════════════════════════════════╝
+
+ Performance counter stats for './bench_blaster --duration 3':
+
+          3,009.77 msec task-clock:u                     #    1.000 CPUs utilized             
+                 0      context-switches:u               #    0.000 /sec                      
+                 0      cpu-migrations:u                 #    0.000 /sec                      
+               145      page-faults:u                    #   48.176 /sec                      
+    16,918,253,158      cpu_atom/instructions/u          #    1.78  insn per cycle              (0.02%)
+    32,360,691,551      cpu_core/instructions/u          #    2.45  insn per cycle              (99.98%)
+     9,511,555,687      cpu_atom/cycles/u                #    3.160 GHz                         (0.02%)
+    13,196,209,479      cpu_core/cycles/u                #    4.384 GHz                         (99.98%)
+     2,861,962,718      cpu_atom/branches/u              #  950.890 M/sec                       (0.02%)
+     5,487,242,501      cpu_core/branches/u              #    1.823 G/sec                       (99.98%)
+        66,697,197      cpu_atom/branch-misses/u         #    2.33% of all branches             (0.02%)
+       126,837,731      cpu_core/branch-misses/u         #    2.31% of all branches             (99.98%)
+             TopdownL1 (cpu_core)                 #     26.7 %  tma_backend_bound      
+                                                  #     22.3 %  tma_bad_speculation    
+                                                  #      6.7 %  tma_frontend_bound     
+                                                  #     44.3 %  tma_retiring             (99.98%)
+                                                  #     20.7 %  tma_bad_speculation    
+                                                  #     50.7 %  tma_retiring             (0.02%)
+                                                  #     18.9 %  tma_backend_bound      
+                                                  #      9.8 %  tma_frontend_bound       (0.02%)
+     <not counted>      cpu_atom/L1-dcache-loads/u                                              (0.00%)
+     7,500,695,061      cpu_core/L1-dcache-loads/u       #    2.492 G/sec                       (99.98%)
+        12,315,648      cpu_core/L1-dcache-load-misses/u #    0.16% of all L1-dcache accesses   (99.98%)
+     <not counted>      cpu_atom/LLC-loads/u                                                    (0.00%)
+            79,344      cpu_core/LLC-loads/u             #   26.362 K/sec                       (99.98%)
+     <not counted>      cpu_atom/LLC-load-misses/u                                              (0.00%)
+            29,377      cpu_core/LLC-load-misses/u       #   37.02% of all LL-cache accesses    (99.98%)
+
+       3.010351519 seconds time elapsed
+
+       3.002528000 seconds user
+       0.003333000 seconds sys
+
+

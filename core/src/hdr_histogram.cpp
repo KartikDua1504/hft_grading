@@ -52,7 +52,7 @@ void HdrHistogram::record_with_count(uint64_t value, uint64_t count) noexcept {
     if (idx < counts_len_) {
         counts_[idx] += count;
         total_count_ += count;
-        total_sum_ += static_cast<double>(value) * static_cast<double>(count);
+        total_sum_ += value * count;
         if (value < min_value_) min_value_ = value;
         if (value > max_value_) max_value_ = value;
     }
@@ -82,7 +82,7 @@ HdrHistogram::Percentiles HdrHistogram::get_percentiles() const noexcept {
     p.min = min_value_;
     p.max = max_value_;
     p.total_count = total_count_;
-    p.mean = total_sum_ / static_cast<double>(total_count_);
+    p.mean = static_cast<double>(total_sum_) / static_cast<double>(total_count_);
 
     const uint64_t t50  = static_cast<uint64_t>(std::ceil(0.50 * static_cast<double>(total_count_)));
     const uint64_t t90  = static_cast<uint64_t>(std::ceil(0.90 * static_cast<double>(total_count_)));
@@ -109,7 +109,7 @@ void HdrHistogram::reset() noexcept {
     total_count_ = 0;
     min_value_ = UINT64_MAX;
     max_value_ = 0;
-    total_sum_ = 0.0;
+    total_sum_ = 0;
 }
 
 std::size_t HdrHistogram::value_to_index(uint64_t value) const noexcept {
