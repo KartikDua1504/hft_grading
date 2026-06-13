@@ -1,21 +1,8 @@
 #pragma once
-// =============================================================================
-// cpu_affinity.hpp — Deterministic CPU Core Pinning
-// =============================================================================
-// Pin threads to isolated cores for jitter-free benchmarking.
-//
-// Architecture (on a 48-core c8i.metal-48xl):
-//   Cores 0-3:   OS + Docker + NGINX + FastAPI (untouched by isolcpus)
-//   Cores 4-7:   Order Blaster (load generator)
-//   Cores 8-11:  Contestant process (via taskset)
-//   Cores 12-15: Shadow orderbook + validation
-//   Cores 16-47: Available for parallel contests
-//
-// Usage:
-//   CpuAffinity::pin_this_thread(4);        // Pin to core 4
-//   CpuAffinity::pin_this_thread({4,5,6,7}); // Pin to core set
-//   CpuAffinity::pin_pid(pid, 8);           // Pin child process
-// =============================================================================
+
+// --- Deterministic CPU Core Pinning ---
+// Pin threads to isolated cores for jitter-free execution.
+// Uses pthread_setaffinity_np and sched_setaffinity.
 
 #include <cstdint>
 #include <cstdio>
@@ -27,7 +14,7 @@
 
 namespace iicpc {
 
-// Core assignments (configurable per deployment)
+// --- Core Assignments ---
 struct CoreMap {
     static constexpr int BLASTER_CORE     = 4;
     static constexpr int BLASTER_CORE_END = 7;
@@ -39,7 +26,7 @@ struct CoreMap {
 
 class CpuAffinity {
 public:
-    // Pin current thread to a single core
+    /// Pin current thread to a single core
     static bool pin_this_thread(int core) noexcept {
         cpu_set_t cpuset;
         CPU_ZERO(&cpuset);
@@ -55,7 +42,7 @@ public:
         return true;
     }
 
-    // Pin current thread to a set of cores
+    /// Pin current thread to a set of cores
     static bool pin_this_thread(std::initializer_list<int> cores) noexcept {
         cpu_set_t cpuset;
         CPU_ZERO(&cpuset);
@@ -70,7 +57,7 @@ public:
         return true;
     }
 
-    // Pin an external process (by PID) to a single core
+    /// Pin an external process (by PID) to a single core
     static bool pin_pid(pid_t pid, int core) noexcept {
         cpu_set_t cpuset;
         CPU_ZERO(&cpuset);
@@ -86,7 +73,7 @@ public:
         return true;
     }
 
-    // Pin an external process to a range of cores
+    /// Pin an external process to a range of cores
     static bool pin_pid_range(pid_t pid, int start, int end) noexcept {
         cpu_set_t cpuset;
         CPU_ZERO(&cpuset);
@@ -102,7 +89,7 @@ public:
         return true;
     }
 
-    // Set SCHED_FIFO real-time priority (requires root or CAP_SYS_NICE)
+    /// Set SCHED_FIFO real-time priority (requires root or CAP_SYS_NICE)
     static bool set_realtime(int priority = 90) noexcept {
         struct sched_param param{};
         param.sched_priority = priority;
@@ -116,12 +103,12 @@ public:
         return true;
     }
 
-    // Get current core
+    /// Get current core ID
     static int current_core() noexcept {
         return sched_getcpu();
     }
 
-    // Print affinity info
+    /// Print affinity info to stderr
     static void print_info() noexcept {
         int ncores = sysconf(_SC_NPROCESSORS_ONLN);
         std::fprintf(stderr, "[affinity] Available cores: %d\n", ncores);

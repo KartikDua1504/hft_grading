@@ -1,17 +1,9 @@
 #pragma once
-// =============================================================================
-// arena.hpp — Huge-Page Backed Thread-Local Bump Allocator
-// =============================================================================
-// This is the memory foundation of the entire system. ALL hot-path allocations
-// go through this allocator. No new, no delete, no malloc on the hot path.
-//
-// Design decisions:
-//   1. mmap with MAP_HUGETLB|MAP_HUGE_2MB to eliminate TLB thrashing
-//   2. Thread-local instances — zero contention, zero atomics
-//   3. 64-byte aligned returns — every allocation lands on a cache line boundary
-//   4. Bump-only semantics — no free(), only reset() between batches
-//   5. Fallback to regular mmap if hugepages unavailable (graceful degradation)
-// =============================================================================
+
+// --- Huge-Page Backed Thread-Local Bump Allocator ---
+// Bump allocator using mmap + MAP_HUGETLB for TLB-friendly allocation.
+// Thread-local, 64-byte aligned returns, no free() — only reset().
+// Falls back to regular mmap if hugepages unavailable.
 
 #include "core/types.hpp"
 
@@ -42,7 +34,7 @@ public:
     [[nodiscard]] bool init(std::size_t size = DEFAULT_ARENA_SIZE) noexcept;
 
     /// Allocate count objects of type T, aligned to 64-byte boundary.
-    /// Returns nullptr if arena is exhausted (should never happen if sized correctly).
+    /// Returns nullptr if arena is exhausted.
     template<typename T>
     [[nodiscard]] T* allocate(std::size_t count = 1) noexcept {
         static_assert(std::is_trivially_constructible_v<T>,
@@ -65,7 +57,7 @@ public:
     }
 
     /// Reset the arena — all previous allocations become invalid.
-    /// This is the "deallocation" mechanism: O(1), just resets the bump pointer.
+    /// O(1), just resets the bump pointer.
     void reset() noexcept;
 
     /// Query arena state

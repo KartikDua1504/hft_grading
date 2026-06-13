@@ -1,6 +1,4 @@
-// =============================================================================
 // payload_gen.cpp — Payload generation (thin, inline helpers in header)
-// =============================================================================
 #include "loadgen/payload_gen.hpp"
 
 namespace iicpc {

@@ -1,7 +1,5 @@
-// =============================================================================
 // sample_orderbook.cpp — Sample Contestant Orderbook Implementation
-// =============================================================================
-// THIS IS WHAT CONTESTANTS WRITE. Their code:
+// Reference contestant implementation. The engine:
 //   1. Connects to the host gateway via Unix domain socket
 //   2. Receives orders (OrderEntry, CancelRequest)
 //   3. Processes them through their orderbook (price-time priority)
@@ -9,7 +7,6 @@
 //
 // This sample implements a basic LOB with std::map (intentionally naive).
 // Good contestants will use SoA arrays, arena allocators, etc.
-// =============================================================================
 
 #include "sdk/protocol.hpp"
 
@@ -27,9 +24,7 @@
 
 using namespace iicpc;
 
-// =============================================================================
 // Response struct (must match sandbox_bridge.hpp ContestantResponse layout)
-// =============================================================================
 struct alignas(64) Response {
     uint32_t order_id;
     MsgType  response_type;
@@ -45,9 +40,7 @@ struct alignas(64) Response {
 };
 static_assert(sizeof(Response) == 64);
 
-// =============================================================================
 // Simple Order struct
-// =============================================================================
 struct Order {
     uint32_t client_order_id;
     int64_t  price;
@@ -55,9 +48,7 @@ struct Order {
     Side     side;
 };
 
-// =============================================================================
 // Naive Orderbook (std::map — contestants should do better)
-// =============================================================================
 class SimpleOrderbook {
 public:
     // Process limit order: match then rest
@@ -151,9 +142,7 @@ private:
     std::map<int64_t, std::deque<Order>> asks_;
 };
 
-// =============================================================================
 // Main — Connect to gateway, process orders
-// =============================================================================
 int main(int argc, char* argv[]) {
     ::signal(SIGPIPE, SIG_IGN);
 

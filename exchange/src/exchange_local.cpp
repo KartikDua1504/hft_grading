@@ -1,6 +1,4 @@
-// =============================================================================
 // exchange_local.cpp — Local Exchange Test Harness
-// =============================================================================
 // Runs the full exchange pipeline locally (no Firecracker) for testing:
 //   1. Starts matching engine + gateway (host side)
 //   2. Forks contestant strategy (connects via UDS)
@@ -11,7 +9,6 @@
 // Usage:
 //   ./exchange_local [--duration 30] [--ticks-per-sec 10000]
 //                    [--strategy /path/to/strategy_binary]
-// =============================================================================
 
 #include "exchange/match_engine.hpp"
 #include "exchange/gateway.hpp"
@@ -63,14 +60,11 @@ int main(int argc, char* argv[]) {
     auto cfg = parse_args(argc, argv);
 
     std::fprintf(stderr, "\n");
-    std::fprintf(stderr, "╔══════════════════════════════════════════════════════════╗\n");
-    std::fprintf(stderr, "║   IICPC Local Exchange                                  ║\n");
-    std::fprintf(stderr, "║   Matching Engine + Gateway + Strategy Test              ║\n");
-    std::fprintf(stderr, "╚══════════════════════════════════════════════════════════╝\n\n");
+    std::fprintf(stderr, "--- IICPC Local Exchange ---\n");
 
-    // =========================================================================
+    std::fprintf(stderr, "  Matching Engine + Gateway + Strategy Test\n\n");
+
     // 1. Initialize arena + matching engine
-    // =========================================================================
     HugePageArena arena;
     arena.init(256ULL * 1024 * 1024);
     if (!arena.is_initialized()) {
@@ -92,9 +86,7 @@ int main(int argc, char* argv[]) {
     std::fprintf(stderr, "[exchange] Contestant registered (id=%u)\n",
                  contestant_id);
 
-    // =========================================================================
     // 2. Start gateway
-    // =========================================================================
     GatewayConfig gw_cfg{};
     gw_cfg.socket_path = cfg.socket_path;
     gw_cfg.contestant_id = contestant_id;
@@ -102,9 +94,7 @@ int main(int argc, char* argv[]) {
     Gateway gateway;
     gateway.init(gw_cfg);
 
-    // =========================================================================
     // 3. Fork strategy process (if binary provided)
-    // =========================================================================
     pid_t strategy_pid = -1;
     if (cfg.strategy_binary) {
         // Start gateway listener BEFORE forking strategy
@@ -146,9 +136,7 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    // =========================================================================
     // 4. Send session start
-    // =========================================================================
     auto start_ts = std::chrono::system_clock::now();
     uint64_t start_ns = static_cast<uint64_t>(
         std::chrono::duration_cast<std::chrono::nanoseconds>(
@@ -159,9 +147,7 @@ int main(int argc, char* argv[]) {
         std::fprintf(stderr, "[exchange] Session started\n");
     }
 
-    // =========================================================================
     // 5. Main loop — tick + process orders + forward fills
-    // =========================================================================
     const auto match_start = std::chrono::steady_clock::now();
     const auto match_end = match_start +
         std::chrono::milliseconds(me_cfg.match_duration_ms);
@@ -178,9 +164,7 @@ int main(int argc, char* argv[]) {
     while (!g_shutdown.load() && std::chrono::steady_clock::now() < match_end) {
         auto now = std::chrono::steady_clock::now();
 
-        // =====================================================================
         // Generate market data tick at configured rate
-        // =====================================================================
         if (now >= next_tick) {
             uint64_t ts_ns = static_cast<uint64_t>(
                 std::chrono::duration_cast<std::chrono::nanoseconds>(
@@ -199,9 +183,7 @@ int main(int argc, char* argv[]) {
             if (next_tick < now) next_tick = now + tick_interval;
         }
 
-        // =====================================================================
         // Receive orders from contestant (non-blocking)
-        // =====================================================================
         if (gateway.is_connected()) {
             MsgType type = gateway.recv_from_contestant(recv_buf, sizeof(recv_buf));
             uint64_t ts_ns = static_cast<uint64_t>(
@@ -227,17 +209,13 @@ int main(int argc, char* argv[]) {
             }
         }
 
-        // =====================================================================
         // Forward outbound messages (fills/acks) to contestant
-        // =====================================================================
         OutboundMsg outmsg;
         while (engine.pop_outbound(outmsg)) {
             gateway.forward_outbound(outmsg);
         }
 
-        // =====================================================================
         // Periodic report
-        // =====================================================================
         auto elapsed = std::chrono::steady_clock::now() - match_start;
         int secs = static_cast<int>(
             std::chrono::duration_cast<std::chrono::seconds>(elapsed).count());
@@ -256,9 +234,7 @@ int main(int argc, char* argv[]) {
         }
     }
 
-    // =========================================================================
     // 6. Session end
-    // =========================================================================
     uint64_t end_ns = static_cast<uint64_t>(
         std::chrono::duration_cast<std::chrono::nanoseconds>(
             std::chrono::system_clock::now().time_since_epoch()).count());
@@ -280,9 +256,7 @@ int main(int argc, char* argv[]) {
         ::waitpid(strategy_pid, &wstatus, 0);
     }
 
-    // =========================================================================
     // 7. Final report
-    // =========================================================================
     auto& cs = engine.contestants();
     int64_t mid = engine.book().best_bid_price() > 0
         ? (engine.book().best_bid_price() + engine.book().best_ask_price()) / 2
@@ -294,20 +268,18 @@ int main(int argc, char* argv[]) {
                               static_cast<double>(PRICE_MULTIPLIER);
 
     std::fprintf(stderr, "\n");
-    std::fprintf(stderr, "╔══════════════════════════════════════════════════════════════╗\n");
-    std::fprintf(stderr, "║                 MATCH RESULTS                               ║\n");
-    std::fprintf(stderr, "╠══════════════════════════════════════════════════════════════╣\n");
-    std::fprintf(stderr, "║  Duration:     %u seconds                                   ║\n",
+    std::fprintf(stderr, "--- IICPC Local Exchange ---\n");
+    std::fprintf(stderr, "\n--- Match Results ---\n");
+    std::fprintf(stderr, "  Duration:     %u seconds                                   \n",
                  cfg.duration_secs);
-    std::fprintf(stderr, "║  Ticks:        %-44lu  ║\n", tick_count);
-    std::fprintf(stderr, "║  Orders:       %-44lu  ║\n", orders_processed);
-    std::fprintf(stderr, "║  Fills:        %-44u  ║\n",
+    std::fprintf(stderr, "  Ticks:        %-44lu  \n", tick_count);
+    std::fprintf(stderr, "  Orders:       %-44lu  \n", orders_processed);
+    std::fprintf(stderr, "  Fills:        %-44u  \n",
                  cs.total_fills[contestant_id]);
-    std::fprintf(stderr, "║  Position:     %-44d  ║\n",
+    std::fprintf(stderr, "  Position:     %-44d  \n",
                  cs.position[contestant_id]);
-    std::fprintf(stderr, "║  Realized PnL: $%-43.2f ║\n", realized_dollars);
-    std::fprintf(stderr, "║  Total PnL:    $%-43.2f ║\n", pnl_dollars);
-    std::fprintf(stderr, "╚══════════════════════════════════════════════════════════════╝\n");
+    std::fprintf(stderr, "  Realized PnL: $%-43.2f \n", realized_dollars);
+    std::fprintf(stderr, "  Total PnL:    $%-43.2f \n", pnl_dollars);
 
     return 0;
 }

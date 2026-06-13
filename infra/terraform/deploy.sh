@@ -1,7 +1,5 @@
 #!/bin/bash
-# =============================================================================
 # deploy.sh — One-Command Production Deployment
-# =============================================================================
 # Usage:
 #   ./deploy.sh init        — First-time: terraform init + plan
 #   ./deploy.sh plan        — Preview infrastructure changes
@@ -12,7 +10,6 @@
 #   ./deploy.sh status      — Check instance status + health
 #   ./deploy.sh fpga-on     — Enable FPGA instances
 #   ./deploy.sh fpga-off    — Disable FPGA instances
-# =============================================================================
 
 set -euo pipefail
 
@@ -32,9 +29,7 @@ ok()  { echo -e "${GREEN}[✓]${NC} $*"; }
 warn(){ echo -e "${YELLOW}[!]${NC} $*"; }
 err() { echo -e "${RED}[✗]${NC} $*"; }
 
-# =============================================================================
 # Preflight checks
-# =============================================================================
 preflight() {
     log "Running preflight checks..."
     local failed=0
@@ -96,9 +91,7 @@ preflight() {
     ok "All preflight checks passed"
 }
 
-# =============================================================================
 # Commands
-# =============================================================================
 cmd_init() {
     preflight
     log "Initializing Terraform..."
@@ -344,9 +337,7 @@ cmd_fpga_off() {
     log "Run './deploy.sh apply' to destroy FPGA instances"
 }
 
-# =============================================================================
 # Main
-# =============================================================================
 case "${1:-help}" in
     init)     cmd_init ;;
     plan)     cmd_plan ;;

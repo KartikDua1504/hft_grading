@@ -1,14 +1,10 @@
 #!/bin/bash
-# =============================================================================
 # dev.sh — Start full stack locally (FastAPI + SvelteKit)
-# =============================================================================
 set -e
 
 IICPC_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
-echo "╔══════════════════════════════════════════╗"
-echo "║     IICPC Arena — Dev Environment        ║"
-echo "╚══════════════════════════════════════════╝"
+echo "  IICPC Arena — Dev Environment"
 
 # Check Redis
 if ! redis-cli ping &>/dev/null; then

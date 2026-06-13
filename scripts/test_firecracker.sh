@@ -1,14 +1,11 @@
 #!/bin/bash
-# =============================================================================
 # test_firecracker.sh — Boot-test a Firecracker microVM
-# =============================================================================
 # Prerequisites:
 #   - /usr/local/bin/firecracker installed
 #   - /dev/kvm accessible
 #   - vmlinux.bin + rootfs.ext4 in infra/firecracker/
 #
 # Usage: sudo ./test_firecracker.sh
-# =============================================================================
 
 set -euo pipefail
 
@@ -115,8 +112,6 @@ wait ${FC_PID} 2>/dev/null || true
 rm -f "${SOCKET_PATH}"
 
 echo ""
-echo "╔═══════════════════════════════════════════════╗"
-echo "║  Firecracker Boot Test: PASS                  ║"
-echo "║  Boot time: ${BOOT_MS} ms                          ║"
-echo "║  vCPUs: 2, Memory: 256 MiB                    ║"
-echo "╚═══════════════════════════════════════════════╝"
+echo "  Firecracker Boot Test: PASS"
+echo "  Boot time: ${BOOT_MS} ms"
+echo "  vCPUs: 2, Memory: 256 MiB"

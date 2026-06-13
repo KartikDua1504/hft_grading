@@ -1,6 +1,4 @@
-// =============================================================================
 // order_parser.sv — Binary Protocol Parser (SystemVerilog)
-// =============================================================================
 // Extracts OrderEntry/CancelRequest fields from raw network payload.
 // Matches the C++ protocol.hpp wire format exactly.
 //
@@ -23,7 +21,6 @@
 //   [4:7]  client_order_id (uint32, LE)
 //   [8:15] exchange_order_id (uint64, LE)
 //   [16:31] padding
-// =============================================================================
 
 `timescale 1ns / 1ps
 `default_nettype none

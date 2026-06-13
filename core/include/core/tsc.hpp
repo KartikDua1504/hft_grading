@@ -1,16 +1,10 @@
 #pragma once
-// =============================================================================
-// tsc.hpp — Hardware Cycle Counter (RDTSC) Wrappers
-// =============================================================================
-// We measure latency by reading the CPU's Time Stamp Counter directly.
-// This gives cycle-accurate measurements without kernel overhead.
-//
-// On Alder Lake with constant_tsc and nonstop_tsc flags (verified on this CPU),
-// the TSC ticks at a constant rate regardless of frequency scaling.
-//
-// We calibrate TSC-to-nanoseconds once at startup using clock_gettime as
-// a reference, then never touch the kernel clock again on the hot path.
-// =============================================================================
+
+// --- Hardware Cycle Counter (RDTSC) Wrappers ---
+// Measures latency via the CPU Time Stamp Counter directly.
+// Cycle-accurate, no kernel overhead.
+// On constant_tsc / nonstop_tsc CPUs, TSC ticks at a constant rate.
+// Calibrated once at startup using clock_gettime as reference.
 
 #include <cstdint>
 #include <cstdio>
@@ -19,15 +13,13 @@
 
 namespace iicpc {
 
-/// Read the Time Stamp Counter. This is a single instruction, ~1 cycle latency.
-/// NOT serializing — use rdtscp() if you need a fence.
+/// Read TSC. Single instruction, ~1 cycle latency. NOT serializing.
 inline uint64_t rdtsc() noexcept {
     return __rdtsc();
 }
 
 /// Read TSC with serialization (RDTSCP). Ensures all prior instructions
-/// have completed before reading the counter. Slightly more expensive (~20 cycles)
-/// but prevents out-of-order measurement artifacts.
+/// complete before reading. ~20 cycles overhead.
 inline uint64_t rdtscp() noexcept {
     unsigned aux;
     return __rdtscp(&aux);
@@ -40,8 +32,8 @@ struct TscCalibration {
     uint64_t tsc_hz;       // TSC frequency in Hz (integer)
 };
 
-/// Calibrate the TSC frequency by measuring against CLOCK_MONOTONIC.
-/// This takes ~100ms and should only be called once at startup.
+/// Calibrate TSC frequency by measuring against CLOCK_MONOTONIC.
+/// Takes ~100ms — call once at startup only.
 inline TscCalibration calibrate_tsc() noexcept {
     constexpr int64_t CALIBRATION_NS = 100'000'000LL; // 100ms
 
@@ -85,7 +77,7 @@ inline TscCalibration calibrate_tsc() noexcept {
     };
 }
 
-/// Convert TSC tick delta to nanoseconds using pre-calibrated value
+/// Convert TSC tick delta to nanoseconds
 inline double tsc_to_ns(uint64_t ticks, const TscCalibration& cal) noexcept {
     return static_cast<double>(ticks) * cal.tsc_to_ns;
 }

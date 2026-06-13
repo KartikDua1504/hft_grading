@@ -1,10 +1,7 @@
 #!/bin/bash
-# =============================================================================
 # start.sh — IICPC Arena: One-Command Full Stack Launch
-# =============================================================================
 # Starts Redis, FastAPI backend, and SvelteKit frontend.
 # Usage: bash start.sh
-# =============================================================================
 set -e
 
 IICPC_ROOT="$(cd "$(dirname "$0")" && pwd)"
@@ -12,9 +9,8 @@ PIDS=()
 
 cleanup() {
     echo ""
-    echo "╔══════════════════════════════════════════╗"
-    echo "║     Shutting down IICPC Arena...         ║"
-    echo "╚══════════════════════════════════════════╝"
+    echo "--- Shutting down IICPC Arena ---"
+    
     for pid in "${PIDS[@]}"; do
         kill "$pid" 2>/dev/null || true
     done
@@ -27,13 +23,8 @@ cleanup() {
 }
 trap cleanup INT TERM
 
-echo ""
-echo "╔══════════════════════════════════════════════════════════╗"
-echo "║                                                        ║"
-echo "║     ⚡  IICPC ARENA — Full Stack Launcher  ⚡          ║"
-echo "║                                                        ║"
-echo "╚══════════════════════════════════════════════════════════╝"
-echo ""
+echo "--- Shutting down IICPC Arena ---"
+echo "--- IICPC Arena: Full Stack Launcher ---"
 
 STARTED_REDIS=0
 
@@ -60,7 +51,6 @@ else
 fi
 
 # ─── Step 2: C++ Engine (optional — build if CMake present) ──────────────────
-echo ""
 echo "━━━ [2/4] C++ Engine ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 if [ -f "$IICPC_ROOT/build/run_contest" ]; then
     echo "[✓] Engine binary found: build/run_contest"
@@ -80,7 +70,6 @@ else
 fi
 
 # ─── Step 3: FastAPI Backend ─────────────────────────────────────────────────
-echo ""
 echo "━━━ [3/4] FastAPI Backend ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 VENV="$IICPC_ROOT/web/backend/.venv"
 if [ ! -d "$VENV" ]; then
@@ -107,7 +96,6 @@ else
 fi
 
 # ─── Step 4: SvelteKit Frontend ──────────────────────────────────────────────
-echo ""
 echo "━━━ [4/4] SvelteKit Frontend ━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 cd "$IICPC_ROOT/web/frontend"
 if [ ! -d "node_modules" ]; then
@@ -119,18 +107,11 @@ echo "[*] Starting SvelteKit on :5173..."
 npm run dev -- --port 5173 --host &
 PIDS+=($!)
 
-echo ""
-echo "╔══════════════════════════════════════════════════════════╗"
-echo "║                                                        ║"
-echo "║  ✅  IICPC Arena is LIVE                                ║"
-echo "║                                                        ║"
-echo "║  Frontend:    http://localhost:5173                     ║"
-echo "║  Backend API: http://localhost:8000/api/health          ║"
-echo "║  API Docs:    http://localhost:8000/docs                ║"
-echo "║                                                        ║"
-echo "║  Press Ctrl+C to stop everything                       ║"
-echo "║                                                        ║"
-echo "╚══════════════════════════════════════════════════════════╝"
-echo ""
+echo "--- Shutting down IICPC Arena ---"
+echo "  IICPC Arena is running."
+echo "  Frontend:    http://localhost:5173                     "
+echo "  Backend API: http://localhost:8000/api/health          "
+echo "  API Docs:    http://localhost:8000/docs                "
+echo "    Press Ctrl+C to stop all services."
 
 wait

@@ -1,13 +1,10 @@
-# =============================================================================
 # main.py — IICPC Competition API Server
-# =============================================================================
 # FastAPI application with:
 #   - File upload (streamed to disk, not buffered in RAM)
 #   - Redis job queue (LPUSH/RPOP FIFO)
 #   - JWT authentication
 #   - WebSocket live leaderboard updates
 #   - Background worker for contest execution
-# =============================================================================
 
 import asyncio
 import hashlib
@@ -43,9 +40,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger("iicpc")
 
-# =============================================================================
 # Configuration
-# =============================================================================
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
 JWT_SECRET = os.getenv("JWT_SECRET", "iicpc-dev-secret-change-in-production")
 JWT_ALGORITHM = "HS256"
@@ -86,18 +81,14 @@ _total_submissions = 0
 _total_scored = 0
 _total_failed = 0
 
-# =============================================================================
 # Redis Keys
-# =============================================================================
 QUEUE_KEY = "iicpc:submission_queue"        # FIFO queue (list)
 JOB_PREFIX = "iicpc:job:"                   # Per-job state hash
 LEADERBOARD_KEY = "iicpc:leaderboard"       # Sorted set (score → team)
 LIVE_CHANNEL = "iicpc:live"                 # Pub/sub for WebSocket updates
 
 
-# =============================================================================
 # Models
-# =============================================================================
 class RegisterRequest(BaseModel):
     team_name: str
     password: str
@@ -128,9 +119,7 @@ class LeaderboardEntry(BaseModel):
     last_submitted: str
 
 
-# =============================================================================
 # App Lifecycle
-# =============================================================================
 redis_pool: Optional[aioredis.Redis] = None
 ws_connections: list[WebSocket] = []
 
@@ -173,9 +162,7 @@ app.add_middleware(
 )
 
 
-# =============================================================================
 # JWT Auth
-# =============================================================================
 def create_token(team_name: str) -> str:
     payload = {
         "sub": team_name,
@@ -206,9 +193,7 @@ async def get_current_team(request: Request, authorization: str = Query(None)) -
     return verify_token(token)
 
 
-# =============================================================================
 # Auth Endpoints
-# =============================================================================
 # Rate limiting for auth endpoints (per-IP, sliding window)
 _auth_attempts: dict[str, list[float]] = {}
 AUTH_RATE_LIMIT = 10       # max attempts
@@ -268,9 +253,7 @@ async def login(req: LoginRequest, request: Request):
     return {"token": token, "team_name": req.team_name}
 
 
-# =============================================================================
 # Submission Endpoint (streamed file upload)
-# =============================================================================
 ALLOWED_EXTENSIONS = {".cpp", ".cc", ".cxx", ".c", ".h", ".hpp"}
 
 
@@ -389,9 +372,7 @@ async def submit_code(
     return {"job_id": job_id, "status": "queued", "position": queue_depth + 1}
 
 
-# =============================================================================
 # Job Status
-# =============================================================================
 @app.get("/api/job/{job_id}")
 async def get_job_status(job_id: str, team_name: str = Depends(get_current_team)):
     data = await redis_pool.hgetall(f"{JOB_PREFIX}{job_id}")
@@ -413,9 +394,7 @@ async def get_job_status(job_id: str, team_name: str = Depends(get_current_team)
     )
 
 
-# =============================================================================
 # Leaderboard
-# =============================================================================
 @app.get("/api/leaderboard")
 async def get_leaderboard():
     # Get all teams sorted by score (descending)
@@ -437,9 +416,7 @@ async def get_leaderboard():
     return result
 
 
-# =============================================================================
 # Team Submissions History
-# =============================================================================
 @app.get("/api/submissions")
 async def get_submissions(team_name: str = Depends(get_current_team)):
     """Get all submissions for the authenticated team, newest first."""
@@ -471,9 +448,7 @@ async def get_submissions(team_name: str = Depends(get_current_team)):
     return submissions[:50]  # Cap at 50
 
 
-# =============================================================================
 # Recent Activity — Public feed of recent events
-# =============================================================================
 @app.get("/api/activity")
 async def get_activity():
     """Get recent submission activity across all teams (public, no auth)."""
@@ -509,9 +484,7 @@ async def get_activity():
     return activity[:20]
 
 
-# =============================================================================
 # WebSocket — Live Updates
-# =============================================================================
 @app.websocket("/ws/live")
 async def websocket_live(ws: WebSocket):
     await ws.accept()
@@ -547,9 +520,7 @@ async def broadcast_update(data: dict):
         ws_connections.remove(ws)
 
 
-# =============================================================================
 # Background Worker — Processes Submission Queue
-# =============================================================================
 async def submission_worker():
     """
     FIFO worker: pops one job at a time from Redis queue,
@@ -675,9 +646,7 @@ async def run_contest_pipeline(job_id: str, source_path: str) -> dict:
         output_dir.mkdir(parents=True, exist_ok=True)
         sdk_include = project_root / "sdk" / "include"
 
-        # ==================================================================
         # Step 1: Syntax check with g++ (fast fail for bad code)
-        # ==================================================================
         compile_cmd = [
             "g++", "-std=c++23", "-fsyntax-only", "-Wall", "-Wextra",
             f"-I{sdk_include}",
@@ -711,9 +680,7 @@ async def run_contest_pipeline(job_id: str, source_path: str) -> dict:
 
         logger.info("Pipeline compiled: job=%s", job_id[:8])
 
-        # ==================================================================
         # Step 2: Run contest engine (if binary exists)
-        # ==================================================================
         if engine_binary.exists():
             contest_cmd = [
                 str(engine_binary),
@@ -864,9 +831,7 @@ def _parse_match_result(stderr_text: str) -> dict | None:
         return None
 
 
-# =============================================================================
 # Health check
-# =============================================================================
 @app.get("/api/health")
 async def health():
     redis_ok = False
@@ -884,9 +849,7 @@ async def health():
     }
 
 
-# =============================================================================
 # SDK Download — zip of sdk/ for contestants
-# =============================================================================
 @app.get("/api/sdk/download")
 async def download_sdk():
     """Package sdk/include + sdk/examples + sdk/src into a downloadable zip."""
@@ -940,9 +903,7 @@ async def download_sdk():
     )
 
 
-# =============================================================================
 # Metrics endpoint — for monitoring dashboards
-# =============================================================================
 @app.get("/api/metrics")
 async def metrics():
     """Prometheus-style metrics for monitoring."""
@@ -963,9 +924,7 @@ async def metrics():
     }
 
 
-# =============================================================================
 # System status — Firecracker / KVM / infra readiness
-# =============================================================================
 @app.get("/api/system/status")
 async def system_status():
     """Full system readiness check for production deployment."""
@@ -1025,9 +984,7 @@ async def system_status():
     }
 
 
-# =============================================================================
 # Admin authentication helper
-# =============================================================================
 async def verify_admin(request: Request):
     """Check admin password from Authorization header or query param."""
     auth_header = request.headers.get("x-admin-key", "")
@@ -1036,9 +993,7 @@ async def verify_admin(request: Request):
     raise HTTPException(403, "Invalid admin key")
 
 
-# =============================================================================
 # Competition timer endpoints
-# =============================================================================
 @app.get("/api/competition/status")
 async def competition_status():
     """Public endpoint: get competition state + remaining time."""
@@ -1069,9 +1024,7 @@ async def competition_status():
     }
 
 
-# =============================================================================
 # Admin endpoints
-# =============================================================================
 @app.post("/api/admin/login")
 async def admin_login(request: Request):
     """Verify admin password and return confirmation."""
@@ -1222,14 +1175,11 @@ async def admin_all_teams(request: Request):
     return teams
 
 
-# =============================================================================
 # Post-Contest System Test (CF-Style Rejudge)
-# =============================================================================
 # After the contest ends, admin triggers system tests that re-run every
 # scored submission against 10 adversarial stress scenarios. Results are
 # blended: final = min(contest, 0.6 * contest + 0.4 * system_test).
 # Contestants see ONLY aggregate pass/fail — no per-scenario breakdown.
-# =============================================================================
 
 SYSTEST_KEY_STATE = "iicpc:systest:state"       # idle / running / completed
 SYSTEST_KEY_PROGRESS = "iicpc:systest:progress"  # "3/15" format
@@ -1581,9 +1531,7 @@ def _parse_system_test_result(
     return result
 
 
-# =============================================================================
 # Job cleanup worker — removes old uploads and results
-# =============================================================================
 async def job_cleanup_worker():
     """Periodically clean up old job files to prevent disk exhaustion."""
     while True:
@@ -1622,13 +1570,10 @@ async def job_cleanup_worker():
             await asyncio.sleep(60)
 
 
-# =============================================================================
 # Redpanda Consumer — Event Streaming from C++ Engine
-# =============================================================================
 # Consumes contest results from the `iicpc.results` Kafka topic (Redpanda)
 # and broadcasts them to WebSocket clients. This completes the streaming loop:
 #   C++ Engine → Redpanda (iicpc.results) → FastAPI → WebSocket → Browser
-# =============================================================================
 async def redpanda_consumer():
     """
     Minimal Kafka fetch consumer (ApiKey=1, ApiVersion=0).

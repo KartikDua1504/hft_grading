@@ -1,11 +1,8 @@
-// =============================================================================
 // bench_pipeline.cpp — Pipeline Multiplexed Benchmark
-// =============================================================================
 // Tests the PipelineEngine which uses writev() scatter-gather I/O
 // to batch N bot messages through K sockets in K syscalls instead of N.
 //
-// This is the next level beyond the ultra engine.
-// =============================================================================
+// Full pipeline benchmark: blaster → bridge → shadow → telemetry.
 
 #include "core/arena.hpp"
 #include "core/ring_buffer.hpp"
@@ -72,12 +69,10 @@ int main(int argc, char* argv[]) {
     ::signal(SIGPIPE, SIG_IGN);
 
     std::fprintf(stderr, "\n");
-    std::fprintf(stderr, "╔══════════════════════════════════════════════════════════╗\n");
-    std::fprintf(stderr, "║   PIPELINE MULTIPLEXED BENCHMARK                        ║\n");
-    std::fprintf(stderr, "║   writev() scatter-gather, %zu sockets for %zu bots      ║\n",
+    std::fprintf(stderr, "--- Pipeline Multiplexed Benchmark ---\n");
+    std::fprintf(stderr, "  writev() scatter-gather, %zu sockets for %zu bots\n",
                  cfg.pool_size, cfg.num_bots);
-    std::fprintf(stderr, "║   Target: <20µs p50, >1M TPS                            ║\n");
-    std::fprintf(stderr, "╚══════════════════════════════════════════════════════════╝\n\n");
+    std::fprintf(stderr, "  Target: <20us p50, >1M TPS\n\n");
 
     // Arena + TSC
     HugePageArena arena;
@@ -191,34 +186,29 @@ int main(int argc, char* argv[]) {
     auto pct = consumer.latest_percentiles();
 
     std::fprintf(stderr, "\n");
-    std::fprintf(stderr, "╔══════════════════════════════════════════════════════════════╗\n");
-    std::fprintf(stderr, "║             PIPELINE BENCHMARK RESULTS                      ║\n");
-    std::fprintf(stderr, "╠══════════════════════════════════════════════════════════════╣\n");
-    std::fprintf(stderr, "║  Duration:     %.2f seconds                                ║\n", elapsed);
-    std::fprintf(stderr, "║  Transport:    %-44s  ║\n",
+    std::fprintf(stderr, "--- PIPELINE BENCHMARK RESULTS ---\n");
+    std::fprintf(stderr, "--- Duration:     %.2f seconds ---\n", elapsed);
+    std::fprintf(stderr, "--- Transport:    %-44s ---\n",
                  cfg.use_unix ? "Unix Domain Socket" : "TCP/IP");
-    std::fprintf(stderr, "║  Pool Size:    %-44zu  ║\n", cfg.pool_size);
-    std::fprintf(stderr, "║  Bots:         %-44zu  ║\n", cfg.num_bots);
-    std::fprintf(stderr, "║                                                              ║\n");
-    std::fprintf(stderr, "║  Total Sends:  %-44lu  ║\n", sends);
-    std::fprintf(stderr, "║  Total Recvs:  %-44lu  ║\n", recvs);
-    std::fprintf(stderr, "║  Drops:        %-44lu  ║\n", drops);
-    std::fprintf(stderr, "║  TPS:          %-44.0f  ║\n", tps);
-    std::fprintf(stderr, "║                                                              ║\n");
-    std::fprintf(stderr, "║  Latency:                                                    ║\n");
-    std::fprintf(stderr, "║    min:   %10.1f µs                                       ║\n",
+    std::fprintf(stderr, "--- Pool Size:    %-44zu ---\n", cfg.pool_size);
+    std::fprintf(stderr, "--- Bots:         %-44zu ---\n", cfg.num_bots);
+    std::fprintf(stderr, "--- Total Sends:  %-44lu ---\n", sends);
+    std::fprintf(stderr, "--- Total Recvs:  %-44lu ---\n", recvs);
+    std::fprintf(stderr, "--- Drops:        %-44lu ---\n", drops);
+    std::fprintf(stderr, "--- TPS:          %-44.0f ---\n", tps);
+    std::fprintf(stderr, "--- Latency: ---\n");
+    std::fprintf(stderr, "--- min:   %10.1f µs ---\n",
                  static_cast<double>(pct.min) / 1000.0);
-    std::fprintf(stderr, "║    p50:   %10.1f µs                                       ║\n",
+    std::fprintf(stderr, "--- p50:   %10.1f µs ---\n",
                  static_cast<double>(pct.p50) / 1000.0);
-    std::fprintf(stderr, "║    p90:   %10.1f µs                                       ║\n",
+    std::fprintf(stderr, "--- p90:   %10.1f µs ---\n",
                  static_cast<double>(pct.p90) / 1000.0);
-    std::fprintf(stderr, "║    p99:   %10.1f µs                                       ║\n",
+    std::fprintf(stderr, "--- p99:   %10.1f µs ---\n",
                  static_cast<double>(pct.p99) / 1000.0);
-    std::fprintf(stderr, "║    p999:  %10.1f µs                                       ║\n",
+    std::fprintf(stderr, "--- p999:  %10.1f µs ---\n",
                  static_cast<double>(pct.p999) / 1000.0);
-    std::fprintf(stderr, "║    max:   %10.1f µs                                       ║\n",
+    std::fprintf(stderr, "--- max:   %10.1f µs ---\n",
                  static_cast<double>(pct.max) / 1000.0);
-    std::fprintf(stderr, "║                                                              ║\n");
 
     const bool tps_ok = tps >= 100'000.0;
     const bool tps_1m = tps >= 1'000'000.0;
@@ -228,21 +218,20 @@ int main(int argc, char* argv[]) {
     const bool p50_50us = pct.p50 <= 50000;
     const bool p99_100us = pct.p99 <= 100000;
 
-    std::fprintf(stderr, "║  [%s] TPS ≥ 100k                                          ║\n",
+    std::fprintf(stderr, "--- [%s] TPS ≥ 100k ---\n",
                  tps_ok ? "✓" : "✗");
-    std::fprintf(stderr, "║  [%s] TPS ≥ 1M                                             ║\n",
+    std::fprintf(stderr, "--- [%s] TPS ≥ 1M ---\n",
                  tps_1m ? "✓" : "✗");
-    std::fprintf(stderr, "║  [%s] Zero drops                                           ║\n",
+    std::fprintf(stderr, "--- [%s] Zero drops ---\n",
                  drops_ok ? "✓" : "✗");
-    std::fprintf(stderr, "║  [%s] p50 < 5µs (HFT-tier)                                ║\n",
+    std::fprintf(stderr, "--- [%s] p50 < 5µs (HFT-tier) ---\n",
                  p50_5us ? "✓" : "✗");
-    std::fprintf(stderr, "║  [%s] p50 < 20µs (pipeline-tier)                           ║\n",
+    std::fprintf(stderr, "--- [%s] p50 < 20µs (pipeline-tier) ---\n",
                  p50_20us ? "✓" : "✗");
-    std::fprintf(stderr, "║  [%s] p50 < 50µs (exchange-tier)                           ║\n",
+    std::fprintf(stderr, "--- [%s] p50 < 50µs (exchange-tier) ---\n",
                  p50_50us ? "✓" : "✗");
-    std::fprintf(stderr, "║  [%s] p99 < 100µs (deterministic)                          ║\n",
+    std::fprintf(stderr, "--- [%s] p99 < 100µs (deterministic) ---\n",
                  p99_100us ? "✓" : "✗");
-    std::fprintf(stderr, "╚══════════════════════════════════════════════════════════════╝\n");
 
     return 0;
 }

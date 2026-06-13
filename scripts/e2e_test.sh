@@ -1,10 +1,7 @@
 #!/bin/bash
-# =============================================================================
 # e2e_test.sh — IICPC End-to-End Platform Test
-# =============================================================================
 # Tests the full flow: register → login → submit → poll → leaderboard
 # Requires: API server running on localhost:8000, Redis available
-# =============================================================================
 
 set -euo pipefail
 

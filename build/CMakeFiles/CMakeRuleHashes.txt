@@ -1,2 +1,0 @@
-# Hashes of file build rules.
-ecb0a69301dd2616c9af8604aa53884c proto_gen/control.pb.cc

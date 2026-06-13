@@ -1,12 +1,9 @@
 #!/bin/sh
-# =============================================================================
 # contestant_wrapper.sh — Guest-side security wrapper
-# =============================================================================
 # Runs INSIDE the Firecracker VM as init (PID 1).
 # Drops privileges, applies seccomp, then execs the contestant binary.
 #
 # Installed at: /usr/bin/init_wrapper in the rootfs
-# =============================================================================
 
 set -e
 

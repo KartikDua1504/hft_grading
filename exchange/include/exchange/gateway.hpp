@@ -1,18 +1,11 @@
 #pragma once
-// =============================================================================
-// gateway.hpp — Host-Side Gateway (Exchange ↔ Contestant VM Bridge)
-// =============================================================================
-// Per-contestant gateway running on the host. Bridges:
+
+// --- Host-Side Gateway (Exchange ↔ Contestant Bridge) ---
+// Per-contestant gateway on the host. Bridges:
 //   - Exchange side: direct function calls to MatchEngine (same process)
-//   - Contestant side: Unix domain socket (reaches into Firecracker VM)
-//
-// Responsibilities:
-//   - Forward market data ticks to contestant
-//   - Receive orders from contestant, validate, forward to engine
-//   - Forward fills/acks back to contestant
-//   - Rate limiting, heartbeat monitoring
-//   - PnL tracking (authoritative, not contestant's self-report)
-// =============================================================================
+//   - Contestant side: Unix domain socket (into Firecracker VM)
+// Handles market data forwarding, order ingestion, fill/ack delivery,
+// rate limiting, and heartbeat monitoring.
 
 #include "exchange/match_engine.hpp"
 #include "sdk/protocol.hpp"
@@ -46,9 +39,7 @@ public:
         return true;
     }
 
-    // =========================================================================
-    // Create listening socket and wait for contestant to connect
-    // =========================================================================
+    // --- Create listening socket and wait for contestant connection ---
     [[nodiscard]] bool listen_and_accept() noexcept {
         ::unlink(cfg_.socket_path);
 
@@ -79,7 +70,7 @@ public:
 
         std::fprintf(stderr, "[gateway] Listening on %s\n", cfg_.socket_path);
 
-        // Wait for contestant to connect (with timeout)
+        // Wait for contestant connection with timeout
         struct pollfd pfd{};
         pfd.fd = listen_fd_;
         pfd.events = POLLIN;
@@ -96,11 +87,10 @@ public:
             return false;
         }
 
-        // Set non-blocking for the client
+        // Set non-blocking
         int flags = ::fcntl(client_fd_, F_GETFL, 0);
         ::fcntl(client_fd_, F_SETFL, flags | O_NONBLOCK);
 
-        // TCP_NODELAY equivalent for UDS — disable Nagle
         int one = 1;
         ::setsockopt(client_fd_, SOL_SOCKET, SO_KEEPALIVE, &one, sizeof(one));
 
@@ -109,19 +99,14 @@ public:
         return true;
     }
 
-    // =========================================================================
-    // Send a message to the contestant
-    // =========================================================================
+    // --- Send message to contestant ---
     bool send_to_contestant(const void* data, uint32_t size) noexcept {
         if (client_fd_ < 0) return false;
         ssize_t sent = ::send(client_fd_, data, size, MSG_NOSIGNAL);
         return sent == static_cast<ssize_t>(size);
     }
 
-    // =========================================================================
-    // Receive a message from contestant (non-blocking)
-    // Returns message type, or 0 if nothing available
-    // =========================================================================
+    // --- Receive message from contestant (non-blocking) ---
     IICPC_HOT
     MsgType recv_from_contestant(void* buf, uint32_t buf_size) noexcept {
         if (client_fd_ < 0) return static_cast<MsgType>(0);
@@ -132,9 +117,7 @@ public:
         return peek_msg_type(buf);
     }
 
-    // =========================================================================
-    // Send session start to contestant
-    // =========================================================================
+    // --- Send session start ---
     void send_session_start(const MatchEngineConfig& cfg,
                             uint64_t start_ts) noexcept {
         SessionStart ss{};
@@ -149,26 +132,20 @@ public:
         send_to_contestant(&ss, sizeof(ss));
     }
 
-    // =========================================================================
-    // Send market data to contestant
-    // =========================================================================
+    // --- Send market data tick ---
     IICPC_HOT
     void send_market_data(const MarketUpdate& update) noexcept {
         send_to_contestant(&update, sizeof(update));
     }
 
-    // =========================================================================
-    // Forward outbound messages (fills/acks) to contestant
-    // =========================================================================
+    // --- Forward outbound messages (fills/acks) ---
     void forward_outbound(const OutboundMsg& msg) noexcept {
         if (msg.contestant_id == cfg_.contestant_id) {
             send_to_contestant(msg.data, msg.size);
         }
     }
 
-    // =========================================================================
-    // Send session end
-    // =========================================================================
+    // --- Send session end ---
     void send_session_end(const SessionEnd& end) noexcept {
         send_to_contestant(&end, sizeof(end));
     }

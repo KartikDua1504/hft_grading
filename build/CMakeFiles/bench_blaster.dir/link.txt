@@ -1,1 +1,0 @@
-/usr/bin/c++ -O3 -DNDEBUG -flto=auto -Wl,--dependency-file=CMakeFiles/bench_blaster.dir/link.d CMakeFiles/bench_blaster.dir/bench/bench_blaster.cpp.o -o bench_blaster  libiicpc_core.a libiicpc_loadgen.a libiicpc_core.a -lpthread

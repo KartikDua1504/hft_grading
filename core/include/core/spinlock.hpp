@@ -1,21 +1,13 @@
 #pragma once
-// =============================================================================
-// spinlock.hpp — Cache-Line-Aligned Ticket Spinlock + Sequence Lock
-// =============================================================================
-// NO mutexes anywhere. These are the only synchronization primitives allowed
-// on the hot path. All lock-free or spin-based.
-//
-// Why spinlocks beat mutexes for HFT:
-//   - No syscall (futex) — stays in userspace
-//   - No context switch — thread keeps its cache hot
-//   - Deterministic latency — no scheduler jitter
-//   - Works with isolcpus + nohz_full — kernel stays out of the way
+
+// --- Cache-Line-Aligned Ticket Spinlock + Sequence Lock ---
+// Userspace-only synchronization primitives for the hot path.
+// No syscalls, no context switches, deterministic latency.
 //
 // Hierarchy:
 //   1. Lock-free (preferred) — atomics with acquire/release
 //   2. Spinlock (when mutation needs exclusion) — ticket-based, fair
 //   3. SeqLock (reader-writer, single writer) — zero cost for readers
-// =============================================================================
 
 #include "core/types.hpp"
 #include "core/compiler_hints.hpp"
@@ -25,12 +17,9 @@
 
 namespace iicpc {
 
-// =============================================================================
-// Ticket Spinlock — Fair, FIFO ordering, cache-line padded
-// =============================================================================
-// Ticket lock prevents starvation (unlike test-and-set which is unfair).
-// Each waiter gets a monotonic ticket, served in order.
-// =============================================================================
+// --- Ticket Spinlock ---
+// Fair, FIFO ordering. Each waiter gets a monotonic ticket, served in order.
+// Prevents starvation unlike test-and-set.
 class alignas(CACHE_LINE_SIZE) TicketSpinlock {
 public:
     TicketSpinlock() noexcept = default;
@@ -80,14 +69,10 @@ private:
 };
 static_assert(sizeof(TicketSpinlock) == 2 * CACHE_LINE_SIZE);
 
-// =============================================================================
-// SeqLock — Single-Writer, Multiple-Reader, Lock-Free Reads
-// =============================================================================
+// --- SeqLock — Single-Writer, Multiple-Reader ---
 // Writers increment sequence number before and after mutation (odd = writing).
-// Readers check sequence before and after reading — retry if it changed or is odd.
-//
-// ZERO COST for readers (no atomic RMW). Perfect for hot market data.
-// =============================================================================
+// Readers retry if sequence changed or is odd.
+// Zero cost for readers (no atomic RMW).
 class alignas(CACHE_LINE_SIZE) SeqLock {
 public:
     SeqLock() noexcept = default;
@@ -118,7 +103,7 @@ public:
         return seq;
     }
 
-    /// Reader: validate read (call after reading data, retry if returns false)
+    /// Reader: validate read (retry if returns false)
     [[nodiscard]] IICPC_FORCE_INLINE
     bool read_valid(uint32_t start_seq) const noexcept {
         compiler_barrier();
@@ -129,12 +114,9 @@ private:
     alignas(CACHE_LINE_SIZE) std::atomic<uint32_t> seq_{0};
 };
 
-// =============================================================================
-// MPSCQueue — Multi-Producer Single-Consumer Lock-Free Queue
-// =============================================================================
-// For aggregating results from multiple bot threads into a single consumer.
-// Uses atomic linked-list with intrusive nodes. Zero allocation (nodes pre-alloc'd).
-// =============================================================================
+// --- MPSCQueue — Multi-Producer Single-Consumer Lock-Free Queue ---
+// Aggregates results from multiple producer threads to a single consumer.
+// Uses atomic linked-list with intrusive nodes. Zero allocation.
 template<typename T, uint32_t Capacity>
 class MPSCQueue {
     static_assert((Capacity & (Capacity - 1)) == 0, "Capacity must be power of 2");

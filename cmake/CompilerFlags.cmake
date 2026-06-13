@@ -1,11 +1,8 @@
-# ==============================================================================
 # IICPC Benchmarking Platform — Compiler Flags
-# ==============================================================================
 # "We engineered performance."
 #
 # These flags are tuned for Alder Lake i7-12700H with GCC 15.2 / Clang 20.
 # Every flag has a reason. Nothing is cargo-culted.
-# ==============================================================================
 
 # --- Detect compiler ---
 if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
@@ -90,9 +87,7 @@ function(iicpc_target_debug target)
     target_link_options(${target} PRIVATE -fsanitize=address,undefined)
 endfunction()
 
-# ==============================================================================
 # Profile-Guided Optimization (PGO) Support
-# ==============================================================================
 # PGO workflow:
 #   1. Build with `iicpc_target_pgo_generate` (instruments binary)
 #   2. Run benchmarks to collect profile data → generates .gcda files
@@ -105,7 +100,6 @@ endfunction()
 #
 # Expected improvement: 10-20% throughput, 5-15% latency reduction.
 # PGO enables: optimal branch layout, cold code sinking, I-cache optimization.
-# ==============================================================================
 
 set(IICPC_PGO_PROFILE_DIR "${CMAKE_BINARY_DIR}/pgo_profiles" CACHE PATH
     "Directory for PGO profile data")

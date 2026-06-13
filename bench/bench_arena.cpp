@@ -1,6 +1,4 @@
-// =============================================================================
 // bench_arena.cpp — Arena Allocator Micro-Benchmark
-// =============================================================================
 #include "core/arena.hpp"
 #include "core/tsc.hpp"
 #include "core/types.hpp"

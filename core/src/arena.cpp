@@ -1,6 +1,4 @@
-// =============================================================================
-// arena.cpp — Huge-Page Backed Thread-Local Bump Allocator (Implementation)
-// =============================================================================
+// --- Huge-Page Backed Bump Allocator (Implementation) ---
 
 #include "core/arena.hpp"
 
@@ -26,16 +24,15 @@ HugePageArena::~HugePageArena() noexcept {
 
 bool HugePageArena::init(std::size_t size) noexcept {
     if (base_) {
-        // Already initialized — this is a programming error but we don't throw
+        // Already initialized
         return hugepage_backed_;
     }
 
     // Round up to huge page boundary
     size = align_up(size, HUGE_PAGE_SIZE);
     
-    // Attempt 1: 2MB huge pages (preferred)
-    // MAP_POPULATE pre-faults all pages at startup, avoiding multi-µs page
-    // fault latency spikes when the hot path touches a new 2MB boundary.
+    // Attempt 1: 2MB huge pages
+    // MAP_POPULATE pre-faults all pages at startup to avoid page fault latency.
     void* ptr = ::mmap(
         nullptr, size,
         PROT_READ | PROT_WRITE,
@@ -54,7 +51,7 @@ bool HugePageArena::init(std::size_t size) noexcept {
         return true;
     }
 
-    // Attempt 2: Regular pages with MAP_POPULATE (pre-fault to avoid page faults on hot path)
+    // Attempt 2: Regular pages with MAP_POPULATE
     std::fprintf(stderr,
         "[arena] Huge page mmap failed (errno=%d: %s), falling back to regular pages\n",
         errno, std::strerror(errno));
@@ -73,7 +70,7 @@ bool HugePageArena::init(std::size_t size) noexcept {
         return false;
     }
 
-    // Advise kernel for huge page promotion (transparent huge pages)
+    // Advise kernel for transparent huge page promotion
     ::madvise(ptr, size, MADV_HUGEPAGE);
 
     base_ = static_cast<uint8_t*>(ptr);
@@ -92,10 +89,8 @@ void* HugePageArena::allocate_raw(std::size_t bytes, std::size_t alignment) noex
         alignment = CACHE_LINE_SIZE;
     }
 
-    // Align the current offset
     const std::size_t aligned_offset = align_up(offset_, alignment);
 
-    // Check for overflow
     if (aligned_offset + bytes > size_) {
         std::fprintf(stderr,
             "[arena] EXHAUSTED: requested %zu bytes at offset %zu / %zu\n",
@@ -110,16 +105,13 @@ void* HugePageArena::allocate_raw(std::size_t bytes, std::size_t alignment) noex
 
 void HugePageArena::reset() noexcept {
     offset_ = 0;
-    // Note: we do NOT munmap/re-mmap. The memory stays mapped.
-    // This is the entire point of a bump allocator: O(1) reset.
+    // Memory stays mapped. O(1) reset — the point of a bump allocator.
 }
 
 HugePageArena& HugePageArena::thread_local_instance() noexcept {
     // Thread-local static: each thread gets its own arena.
-    // Default size is 256 MiB per thread (configurable via init() call).
     static thread_local HugePageArena arena;
     if (!arena.is_initialized()) {
-        // Per-thread arena is smaller than the main 2GB arena
         arena.init(256 * 1024 * 1024); // 256 MiB per thread
     }
     return arena;

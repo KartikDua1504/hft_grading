@@ -1,13 +1,6 @@
-// =============================================================================
-// strategy_main.cpp — main() wrapper for contestant orderbook engines
-// =============================================================================
-// Contestants link against this. It handles:
-//   1. Connect to platform gateway socket
-//   2. Instantiate contestant's engine via create_strategy()
-//   3. Run the event loop (receive orders, send responses)
-//
-// Compile: g++ -std=c++23 -O2 -o engine contestant.cpp strategy_main.cpp
-// =============================================================================
+// --- main() wrapper for contestant engines ---
+// Handles socket connection and event loop.
+// Contestants link against this and implement create_strategy().
 
 #include "sdk/gateway_client.hpp"
 #include "sdk/strategy_sdk.hpp"
@@ -25,7 +18,6 @@ int main(int argc, char* argv[]) {
     ::signal(SIGTERM, sig_handler);
     ::signal(SIGPIPE, SIG_IGN);
 
-    // Default gateway socket path
     const char* socket_path = "/tmp/iicpc_contest.sock";
 
     for (int i = 1; i < argc; ++i) {
@@ -36,14 +28,12 @@ int main(int argc, char* argv[]) {
 
     std::fprintf(stderr, "[engine] Connecting to platform: %s\n", socket_path);
 
-    // Create contestant engine
     iicpc::IStrategy* engine = iicpc::create_strategy();
     if (!engine) {
         std::fprintf(stderr, "[engine] FATAL: create_strategy() returned null\n");
         return 1;
     }
 
-    // Connect to platform
     iicpc::GatewayClient client;
     if (!client.connect(socket_path)) {
         std::fprintf(stderr, "[engine] FATAL: could not connect to platform\n");

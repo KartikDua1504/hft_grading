@@ -1,6 +1,4 @@
-// =============================================================================
 // sequencer_top.sv — Top-Level FPGA Sequencer Module (SystemVerilog)
-// =============================================================================
 // Wires together: order_parser → sequencer_core → dma_ring
 //
 // This is the top module instantiated in the AWS FPGA Shell (CL region).
@@ -9,7 +7,6 @@
 //   - AXI-Stream inputs from network (one per bot gateway)
 //   - AXI-Lite MMIO for host CPU to read sequenced orders
 //   - Status registers for monitoring
-// =============================================================================
 
 `timescale 1ns / 1ps
 `default_nettype none
@@ -22,17 +19,13 @@ module sequencer_top #(
     input  wire                     clk_250mhz,     // 250 MHz from Shell
     input  wire                     rst_n,
 
-    // =========================================================================
     // AXI-Stream inputs (one per gateway port)
-    // =========================================================================
     input  wire [NUM_PORTS-1:0]             s_axis_tvalid,
     input  wire [NUM_PORTS-1:0][ORDER_BITS-1:0] s_axis_tdata,
     input  wire [NUM_PORTS-1:0][7:0]        s_axis_tuser_contestant_id,
     output logic [NUM_PORTS-1:0]            s_axis_tready,
 
-    // =========================================================================
     // Host MMIO (AXI-Lite slave)
-    // =========================================================================
     input  wire                     mmio_rd_en,
     input  wire [15:0]              mmio_rd_addr,
     output logic [31:0]             mmio_rd_data,
@@ -42,15 +35,11 @@ module sequencer_top #(
     input  wire [15:0]              mmio_wr_addr,
     input  wire [31:0]              mmio_wr_data,
 
-    // =========================================================================
     // Status LEDs / debug
-    // =========================================================================
     output logic [3:0]              status_leds
 );
 
-    // =========================================================================
     // Internal signals
-    // =========================================================================
 
     // Parser outputs (one parser per port)
     logic [NUM_PORTS-1:0]           parser_valid;
@@ -79,9 +68,7 @@ module sequencer_top #(
     logic                           dma_full;
     logic                           dma_empty;
 
-    // =========================================================================
     // Instantiate parsers (one per input port)
-    // =========================================================================
     genvar gi;
     generate
         for (gi = 0; gi < NUM_PORTS; gi++) begin : gen_parsers
@@ -111,9 +98,7 @@ module sequencer_top #(
         end
     endgenerate
 
-    // =========================================================================
     // Sequencer Core
-    // =========================================================================
     sequencer_core #(
         .NUM_PORTS  (NUM_PORTS),
         .ORDER_WIDTH(ORDER_BITS),
@@ -141,10 +126,8 @@ module sequencer_top #(
         .stat_port_active   (seq_port_active)
     );
 
-    // =========================================================================
     // Pack sequenced order into DMA ring entry (128 bytes = 1024 bits)
     // Layout: [seq_no:64][timestamp:64][contestant_id:8][msg_type:8][pad:48][order:512][pad:320]
-    // =========================================================================
     localparam int ENTRY_BITS = 1024;
     logic [ENTRY_BITS-1:0] dma_entry;
 
@@ -159,9 +142,7 @@ module sequencer_top #(
         // Bits [1023:704] = padding
     end
 
-    // =========================================================================
     // DMA Ring Buffer
-    // =========================================================================
     dma_ring #(
         .DEPTH      (RING_DEPTH),
         .ENTRY_WIDTH(ENTRY_BITS)
@@ -187,9 +168,7 @@ module sequencer_top #(
         .stat_empty     (dma_empty)
     );
 
-    // =========================================================================
     // Status LEDs
-    // =========================================================================
     assign status_leds[0] = |seq_port_active;   // Any port active
     assign status_leds[1] = !dma_empty;          // Ring has data
     assign status_leds[2] = dma_full;            // Ring full (bad)

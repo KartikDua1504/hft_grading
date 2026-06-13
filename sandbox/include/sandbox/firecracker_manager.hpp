@@ -1,7 +1,5 @@
 #pragma once
-// =============================================================================
 // firecracker_manager.hpp — Firecracker MicroVM Sandbox Manager
-// =============================================================================
 // Manages Firecracker microVM lifecycle via the Firecracker REST API
 // (Unix domain socket). Each contestant runs inside an isolated microVM
 // with configurable vCPUs, memory, and block devices.
@@ -12,7 +10,6 @@
 //   - ~125ms boot time (practically instant)
 //   - Memory and CPU hard limits enforced by hypervisor, not kernel scheduler
 //   - Used by AWS Lambda and Fargate in production
-// =============================================================================
 
 #include <cstdint>
 #include <cstdio>
@@ -27,14 +24,11 @@
 
 namespace iicpc {
 
-// =============================================================================
 // JSON String Sanitizer — escapes special characters for safe interpolation
-// =============================================================================
 // Prevents malformed JSON from paths containing quotes, backslashes, or
 // control characters. Without this, a rootfs_path like:
 //   /tmp/contestant "evil"/rootfs.ext4
 // would break the JSON payload and cause Firecracker API rejection.
-// =============================================================================
 inline void json_escape(char* dst, size_t dst_size, const char* src) noexcept {
     size_t j = 0;
     for (size_t i = 0; src[i] != '\0' && j < dst_size - 2; ++i) {
@@ -55,9 +49,7 @@ inline void json_escape(char* dst, size_t dst_size, const char* src) noexcept {
     dst[j] = '\0';
 }
 
-// =============================================================================
 // MicroVM Configuration
-// =============================================================================
 struct MicroVMConfig {
     // Firecracker binary
     const char* firecracker_bin = "/usr/local/bin/firecracker";
@@ -87,9 +79,7 @@ struct MicroVMConfig {
     uint32_t jail_id = 0;
 };
 
-// =============================================================================
 // MicroVM State
-// =============================================================================
 enum class VMState : uint8_t {
     CREATED,
     CONFIGURED,
@@ -106,17 +96,13 @@ struct VMStatus {
     char error[256] = {};
 };
 
-// =============================================================================
 // Firecracker Manager
-// =============================================================================
 class FirecrackerManager {
 public:
     FirecrackerManager() noexcept = default;
     ~FirecrackerManager() noexcept { destroy(); }
 
-    // =========================================================================
     // Create and start a microVM
-    // =========================================================================
     [[nodiscard]] bool create(const MicroVMConfig& config) noexcept {
         config_ = config;
 
@@ -173,9 +159,7 @@ public:
         return true;
     }
 
-    // =========================================================================
     // Configure the VM (kernel, rootfs, vCPUs, memory)
-    // =========================================================================
     [[nodiscard]] bool configure() noexcept {
         if (status_.state != VMState::CREATED) {
             set_error("Cannot configure: VM not in CREATED state");
@@ -248,9 +232,7 @@ public:
         return true;
     }
 
-    // =========================================================================
     // Start the VM (boot the guest kernel)
-    // =========================================================================
     [[nodiscard]] bool start() noexcept {
         if (status_.state != VMState::CONFIGURED) {
             set_error("Cannot start: VM not configured");
@@ -267,9 +249,7 @@ public:
         return true;
     }
 
-    // =========================================================================
     // Stop the VM
-    // =========================================================================
     void stop() noexcept {
         if (status_.state == VMState::RUNNING) {
             // Send InstanceHalt action
@@ -278,9 +258,7 @@ public:
         }
     }
 
-    // =========================================================================
     // Destroy the VM and clean up
-    // =========================================================================
     void destroy() noexcept {
         stop();
 
@@ -313,9 +291,7 @@ public:
     [[nodiscard]] const char* socket_path() const noexcept { return status_.socket_path; }
 
 private:
-    // =========================================================================
     // REST API helpers (Firecracker uses HTTP over Unix socket)
-    // =========================================================================
     static int connect_api_socket(const char* path) noexcept {
         int fd = ::socket(AF_UNIX, SOCK_STREAM, 0);
         if (fd < 0) return -1;

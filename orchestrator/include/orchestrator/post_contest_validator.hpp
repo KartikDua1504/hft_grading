@@ -1,7 +1,5 @@
 #pragma once
-// =============================================================================
 // post_contest_validator.hpp — CF-Style Post-Contest System Test Harness
-// =============================================================================
 // After the live contest, this runs every contestant's binary against the
 // full stress scenario battery. Each scenario replays a deterministic,
 // adversarial order stream and validates correctness via ShadowOrderbook.
@@ -13,7 +11,6 @@
 // Final score blending:
 //   final = min(contest_score, 0.6 * contest_score + 0.4 * system_score)
 // System tests can only LOWER a ranking, never boost it.
-// =============================================================================
 
 #include "exchange/stress_scenarios.hpp"
 #include "exchange/shadow_orderbook.hpp"
@@ -32,9 +29,7 @@
 
 namespace iicpc {
 
-// =============================================================================
 // System Test Aggregate Result
-// =============================================================================
 struct SystemTestResult {
     char     contestant_id[64] = {};
     uint32_t scenarios_passed  = 0;
@@ -46,50 +41,39 @@ struct SystemTestResult {
 
     void print_report() const noexcept {
         std::fprintf(stderr, "\n");
-        std::fprintf(stderr, "╔══════════════════════════════════════════════════════════════╗\n");
-        std::fprintf(stderr, "║            SYSTEM TEST RESULTS: %-25s   ║\n", contestant_id);
-        std::fprintf(stderr, "╠══════════════════════════════════════════════════════════════╣\n");
-        std::fprintf(stderr, "║  Scenarios:       %u / %u passed                              ║\n",
+        std::fprintf(stderr, "--- SYSTEM TEST RESULTS: %-25s ---\n", contestant_id);
+        std::fprintf(stderr, "--- Scenarios:       %u / %u passed ---\n",
                      scenarios_passed, scenarios_total);
-        std::fprintf(stderr, "║  System Score:    %-44.4f  ║\n", system_score);
-        std::fprintf(stderr, "║  Original Score:  %-44.4f  ║\n", original_score);
-        std::fprintf(stderr, "║  Final Score:     %-44.4f  ║\n", final_score);
-        std::fprintf(stderr, "╠══════════════════════════════════════════════════════════════╣\n");
+        std::fprintf(stderr, "--- System Score:    %-44.4f ---\n", system_score);
+        std::fprintf(stderr, "--- Original Score:  %-44.4f ---\n", original_score);
+        std::fprintf(stderr, "--- Final Score:     %-44.4f ---\n", final_score);
 
         for (uint32_t i = 0; i < scenarios_total; ++i) {
             const auto& sr = scenarios[i];
-            std::fprintf(stderr, "║  [%s] Scenario %2u: %-20s  score=%.4f       ║\n",
+            std::fprintf(stderr, "--- [%s] Scenario %2u: %-20s  score=%.4f ---\n",
                          sr.passed ? "✓" : "✗",
                          sr.scenario_id, sr.name, sr.correctness);
         }
 
-        std::fprintf(stderr, "╚══════════════════════════════════════════════════════════════╝\n");
     }
 
     // Only show aggregate to contestant (no per-scenario breakdown)
     void print_contestant_report() const noexcept {
         std::fprintf(stderr, "\n");
-        std::fprintf(stderr, "╔══════════════════════════════════════════════════════════════╗\n");
-        std::fprintf(stderr, "║            SYSTEM TEST RESULTS: %-25s   ║\n", contestant_id);
-        std::fprintf(stderr, "╠══════════════════════════════════════════════════════════════╣\n");
-        std::fprintf(stderr, "║  Scenarios Passed:  %u / %-37u ║\n",
+        std::fprintf(stderr, "--- SYSTEM TEST RESULTS: %-25s ---\n", contestant_id);
+        std::fprintf(stderr, "--- Scenarios Passed:  %u / %-37u ---\n",
                      scenarios_passed, scenarios_total);
-        std::fprintf(stderr, "║  System Score:      %-42.4f║\n", system_score);
-        std::fprintf(stderr, "║  Final Score:       %-42.4f║\n", final_score);
-        std::fprintf(stderr, "╚══════════════════════════════════════════════════════════════╝\n");
+        std::fprintf(stderr, "--- System Score:      %-42.4f ---\n", system_score);
+        std::fprintf(stderr, "--- Final Score:       %-42.4f ---\n", final_score);
     }
 };
 
-// =============================================================================
 // Post-Contest Validator
-// =============================================================================
 class PostContestValidator {
 public:
     PostContestValidator() noexcept = default;
 
-    // =========================================================================
     // Run all stress scenarios against a pre-built contestant binary
-    // =========================================================================
     SystemTestResult run_system_tests(
         const char* contestant_id,
         const char* binary_path,
@@ -110,11 +94,9 @@ public:
         result.scenarios_total = num_scenarios;
 
         std::fprintf(stderr, "\n");
-        std::fprintf(stderr, "╔══════════════════════════════════════════════════════════════╗\n");
-        std::fprintf(stderr, "║   SYSTEM TEST: %-43s  ║\n", contestant_id);
-        std::fprintf(stderr, "║   Running %u stress scenarios with Firecracker isolation     ║\n",
+        std::fprintf(stderr, "--- SYSTEM TEST: %-43s ---\n", contestant_id);
+        std::fprintf(stderr, "--- Running %u stress scenarios with Firecracker isolation ---\n",
                      num_scenarios);
-        std::fprintf(stderr, "╚══════════════════════════════════════════════════════════════╝\n");
 
         double weighted_sum = 0.0;
 
@@ -154,9 +136,7 @@ public:
     }
 
 private:
-    // =========================================================================
     // Run a single stress scenario
-    // =========================================================================
     ScenarioResult run_single_scenario(
         const StressScenario& scenario,
         const char* binary_path,

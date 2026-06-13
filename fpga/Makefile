@@ -1,13 +1,10 @@
-# =============================================================================
 # FPGA Makefile — Sequencer + Matching Engine Simulation
-# =============================================================================
 # Targets:
 #   make sim          — Sequencer testbench (Verilator)
 #   make sim_match    — Matching engine testbench (Verilator)
 #   make sim_all      — Run both testbenches
 #   make lint         — Static analysis
 #   make clean        — Clean build artifacts
-# =============================================================================
 
 SHELL := /bin/bash
 
@@ -52,9 +49,7 @@ VER_COMMON := --binary --timing \
 
 all: sim_all
 
-# =============================================================================
 # Sequencer Simulation
-# =============================================================================
 sim: $(VER_SEQ_DIR)/Vtb_sequencer
 	@echo ""
 	@echo "=== Sequencer Testbench ==="
@@ -68,9 +63,7 @@ $(VER_SEQ_DIR)/Vtb_sequencer: $(SEQ_RTL) $(SIM_DIR)/tb_sequencer.sv
 	    $(SEQ_RTL) $(SIM_DIR)/tb_sequencer.sv
 	@$(MAKE) -C $(VER_SEQ_DIR) -f Vtb_sequencer.mk
 
-# =============================================================================
 # Matching Engine Simulation
-# =============================================================================
 sim_match: $(VER_MATCH_DIR)/Vtb_match_engine
 	@echo ""
 	@echo "=== Matching Engine Testbench ==="
@@ -84,22 +77,16 @@ $(VER_MATCH_DIR)/Vtb_match_engine: $(ME_RTL) $(SIM_DIR)/tb_match_engine.sv
 	    $(ME_RTL) $(SIM_DIR)/tb_match_engine.sv
 	@$(MAKE) -C $(VER_MATCH_DIR) -f Vtb_match_engine.mk
 
-# =============================================================================
 # Run All
-# =============================================================================
 sim_all: sim sim_match
 	@echo ""
 	@echo "=== ALL SIMULATIONS COMPLETE ==="
 
-# =============================================================================
 # Lint
-# =============================================================================
 lint: $(ALL_RTL)
 	$(VERILATOR) --lint-only -Wno-fatal -sv $(ALL_RTL)
 
-# =============================================================================
 # Clean
-# =============================================================================
 clean:
 	rm -rf $(BUILD_DIR)
 	rm -f *.vcd *.wdb *.log *.jou

@@ -1,8 +1,6 @@
 #pragma once
-// =============================================================================
 // shm_engine.hpp — Shared Memory IPC Engine (Zero Syscalls on Hot Path)
-// =============================================================================
-// This is the final boss. Eliminates ALL syscalls from the hot path by using
+// Eliminates ALL syscalls from the hot path by using
 // shared-memory ring buffers for communication between loadgen and exchange.
 //
 // Architecture:
@@ -15,7 +13,6 @@
 //   - atomic load/store: ~5-20ns
 //   - memcpy payload: ~10ns
 //   - cache line transfer between cores: ~40-80ns (L3 latency)
-// =============================================================================
 
 #include "core/types.hpp"
 #include "core/tsc.hpp"
@@ -29,9 +26,7 @@
 
 namespace iicpc {
 
-// =============================================================================
 // Shared-memory request/response messages
-// =============================================================================
 struct alignas(64) ShmRequest {
     uint32_t bot_id;
     uint32_t seq_num;
@@ -50,9 +45,7 @@ struct alignas(64) ShmResponse {
 };
 static_assert(sizeof(ShmResponse) == 64, "ShmResponse must be exactly 1 cache line");
 
-// =============================================================================
 // Lock-free SPSC channel (compile-time sized, cache-line separated indices)
-// =============================================================================
 template<typename T, std::size_t Capacity>
 class ShmChannel {
     static_assert((Capacity & (Capacity - 1)) == 0, "Capacity must be power of 2");
@@ -104,9 +97,7 @@ private:
     alignas(CACHE_LINE_SIZE) std::atomic<uint64_t> read_pos_{0};
 };
 
-// =============================================================================
 // Shared Memory Exchange (runs in a separate thread, no syscalls)
-// =============================================================================
 template<std::size_t ChannelCapacity = 65536>
 class ShmExchange {
 public:
@@ -152,9 +143,7 @@ private:
     uint64_t total_processed_ = 0;
 };
 
-// =============================================================================
 // Shared Memory Loadgen Engine (zero syscalls on hot path)
-// =============================================================================
 template<std::size_t ChannelCapacity = 65536>
 class ShmEngine {
 public:

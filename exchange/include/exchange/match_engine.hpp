@@ -1,13 +1,10 @@
 #pragma once
-// =============================================================================
 // match_engine.hpp — Exchange Matching Engine
-// =============================================================================
 // Ties together the orderbook, market data, and gateway I/O.
 // Runs on a pinned core, processes orders, generates fills/acks,
 // publishes market data to connected gateways.
 //
 // Single instrument. PnL-first scoring.
-// =============================================================================
 
 #include "exchange/orderbook.hpp"
 #include "exchange/market_data_gen.hpp"
@@ -21,9 +18,7 @@
 
 namespace iicpc {
 
-// =============================================================================
 // Per-contestant state (SoA, tracked by engine)
-// =============================================================================
 inline constexpr uint32_t MAX_CONTESTANTS = 64;
 inline constexpr uint32_t MAX_ACTIVE_ORDERS_PER_CONTESTANT = 256;
 
@@ -125,9 +120,7 @@ struct ContestantState {
     }
 };
 
-// =============================================================================
 // Match Engine Configuration
-// =============================================================================
 struct MatchEngineConfig {
     uint32_t tick_interval_us   = 100;    // Microseconds between ticks
     uint32_t match_duration_ms  = 30000;  // 30 seconds
@@ -138,10 +131,8 @@ struct MatchEngineConfig {
     MarketDataConfig market_cfg{};
 };
 
-// =============================================================================
 // Outbound message queue (engine → gateway)
 // Each contestant has a queue of outbound messages.
-// =============================================================================
 inline constexpr uint32_t OUTBOUND_QUEUE_SIZE = 4096;
 
 struct OutboundMsg {
@@ -150,9 +141,7 @@ struct OutboundMsg {
     uint32_t contestant_id;
 };
 
-// =============================================================================
 // Match Engine
-// =============================================================================
 class MatchEngine {
 public:
     MatchEngine() noexcept = default;
@@ -190,9 +179,7 @@ public:
         return cid;
     }
 
-    // =========================================================================
     // Process an incoming order from a contestant
-    // =========================================================================
     IICPC_HOT
     void process_order(uint32_t contestant_id,
                        const OrderEntry& order,
@@ -281,9 +268,7 @@ public:
         }
     }
 
-    // =========================================================================
     // Process cancel from contestant
-    // =========================================================================
     void process_cancel(uint32_t contestant_id,
                         const CancelRequest& cancel,
                         uint64_t timestamp_ns) noexcept {
@@ -316,9 +301,7 @@ public:
         enqueue_outbound(contestant_id, &ack, sizeof(ack));
     }
 
-    // =========================================================================
     // Generate next market data tick
-    // =========================================================================
     IICPC_HOT
     MarketUpdate generate_tick(uint64_t timestamp_ns) noexcept {
         MarketUpdate update = market_gen_.next_tick(timestamp_ns);
@@ -339,9 +322,7 @@ public:
         return update;
     }
 
-    // =========================================================================
     // Pop outbound message for a contestant
-    // =========================================================================
     bool pop_outbound(OutboundMsg& msg) noexcept {
         if (outbound_head_ == outbound_tail_) return false;
         msg = outbound_[outbound_head_ % OUTBOUND_QUEUE_SIZE];
@@ -349,9 +330,7 @@ public:
         return true;
     }
 
-    // =========================================================================
     // Generate session end for a contestant
-    // =========================================================================
     SessionEnd make_session_end(uint32_t cid, uint64_t ts) const noexcept {
         int64_t mid = (book_.best_bid_price() + book_.best_ask_price()) / 2;
         if (mid <= 0) mid = market_gen_.last_update().last_trade_price;

@@ -1,18 +1,10 @@
 #pragma once
-// =============================================================================
-// gateway_client.hpp — Engine Client (runs contestant's orderbook)
-// =============================================================================
+
+// --- Gateway Client (Contestant Engine Runner) ---
 // Connects to the host platform via Unix domain socket.
-// Receives OrderEntry and CancelRequest messages from the order blaster.
-// Calls the contestant's IStrategy::on_order / on_cancel.
-// Sends back ContestantResponse structs for scoring.
-//
-// High-performance design:
-//   - 64KB receive buffer (batch reads)
-//   - Response batching (flush every 64 responses or on buffer drain)
-//   - Proper message framing using msg_size() lookup
-//   - Non-blocking response sends with MSG_NOSIGNAL
-// =============================================================================
+// Receives OrderEntry/CancelRequest from the order blaster.
+// Dispatches to contestant's IStrategy implementation.
+// Batched response sends with MSG_NOSIGNAL.
 
 #include "sdk/protocol.hpp"
 #include "sdk/strategy_sdk.hpp"
@@ -26,9 +18,7 @@
 
 namespace iicpc {
 
-// =============================================================================
-// Response sender implementation — batches responses for throughput
-// =============================================================================
+// --- Response Sender — batches responses for throughput ---
 class SocketResponseSender final : public IResponseSender {
 public:
     explicit SocketResponseSender(int fd) noexcept : fd_(fd) {}
@@ -56,9 +46,7 @@ private:
     uint32_t count_ = 0;
 };
 
-// =============================================================================
-// Engine Client — connects to platform, drives contestant's orderbook
-// =============================================================================
+// --- Gateway Client — connects to platform, drives contestant's engine ---
 class GatewayClient {
 public:
     GatewayClient() noexcept = default;
@@ -85,7 +73,7 @@ public:
             return false;
         }
 
-        // Enlarge recv buffer for high-throughput reads
+        // Enlarge socket buffers for high-throughput reads
         int bufsize = 1 << 20; // 1MB
         ::setsockopt(fd_, SOL_SOCKET, SO_RCVBUF, &bufsize, sizeof(bufsize));
         ::setsockopt(fd_, SOL_SOCKET, SO_SNDBUF, &bufsize, sizeof(bufsize));
@@ -97,15 +85,12 @@ public:
         if (fd_ >= 0) { ::close(fd_); fd_ = -1; }
     }
 
-    // =========================================================================
-    // Main event loop — drives the contestant's orderbook engine
-    // =========================================================================
+    // --- Main event loop — drives the contestant's engine ---
     void run(IStrategy& strategy) noexcept {
         if (fd_ < 0) return;
 
         SocketResponseSender sender(fd_);
 
-        // Large receive buffer for batch processing
         static constexpr size_t BUF_SIZE = 65536;
         alignas(64) uint8_t buf[BUF_SIZE];
         size_t buf_used = 0;
@@ -114,21 +99,18 @@ public:
         uint64_t cancels_processed = 0;
 
         while (true) {
-            // Read as much data as possible
             ssize_t n = ::recv(fd_, buf + buf_used, BUF_SIZE - buf_used, 0);
-            if (n <= 0) break; // Disconnected or error
+            if (n <= 0) break;
             buf_used += static_cast<size_t>(n);
 
             // Process all complete messages in the buffer
             size_t offset = 0;
             while (offset < buf_used) {
-                // Need at least 1 byte for message type
                 if (offset >= buf_used) break;
 
                 MsgType type = peek_msg_type(buf + offset);
                 uint32_t msize = msg_size(type);
 
-                // Unknown message type or not enough data for complete message
                 if (msize == 0 || offset + msize > buf_used) break;
 
                 switch (type) {
@@ -169,7 +151,6 @@ public:
                         break;
 
                     default:
-                        // Unknown message — skip
                         std::fprintf(stderr, "[engine] Unknown msg type: %u\n",
                                      static_cast<unsigned>(type));
                         break;
@@ -178,7 +159,7 @@ public:
                 offset += msize;
             }
 
-            // Flush any pending responses after processing this batch
+            // Flush pending responses after processing batch
             sender.flush();
 
             // Move unprocessed bytes to start of buffer

@@ -1,11 +1,8 @@
 #pragma once
-// =============================================================================
 // bot_fleet.hpp — SoA Bot Fleet State for Data Plane
-// =============================================================================
 // Strict Struct-of-Arrays layout. Each field is a contiguous, cache-line
 // aligned array. This maximizes L1/L2 cache hits when iterating over a
 // single field (e.g., all send timestamps) and enables SIMD auto-vectorization.
-// =============================================================================
 
 #include "core/types.hpp"
 #include "core/arena.hpp"
@@ -27,7 +24,7 @@ enum class BotState : uint8_t {
 struct BotFleet {
     std::size_t count = 0;
 
-    // === SoA arrays — each on its own cache-line aligned base ===
+    // --- SoA arrays — each on its own cache-line aligned base ---
     uint32_t*       bot_ids       = nullptr;
     uint64_t*       sequence_nums = nullptr;
     BotState*       states        = nullptr;

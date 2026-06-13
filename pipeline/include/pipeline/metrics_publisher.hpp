@@ -1,13 +1,10 @@
 #pragma once
-// =============================================================================
 // metrics_publisher.hpp — Redpanda/Kafka Metrics Publisher
-// =============================================================================
 // Publishes benchmark telemetry snapshots to Redpanda for downstream
 // consumption by QuestDB (persistence) and Redis (leaderboard).
 //
 // Uses librdkafka C API for minimal overhead. Batches messages to
 // amortize produce overhead.
-// =============================================================================
 
 #include <cstdint>
 #include <cstdio>
@@ -27,13 +24,10 @@
 
 namespace iicpc {
 
-// =============================================================================
 // QuestDB ILP (InfluxDB Line Protocol) Publisher
-// =============================================================================
 // Writes metrics directly to QuestDB via TCP line protocol.
 // Format: measurement,tag=value field=value timestamp_ns
 // Example: latency,contestant=bot1 p50=520i,p99=1160i,tps=9700000 1715250000000000000
-// =============================================================================
 
 class QuestDBPublisher {
 public:
@@ -160,12 +154,9 @@ private:
     uint64_t total_published_ = 0;
 };
 
-// =============================================================================
 // Redis Leaderboard Publisher
-// =============================================================================
 // Minimal RESP (Redis Serialization Protocol) client for sorted set updates.
 // No dependency on hiredis — pure socket RESP commands.
-// =============================================================================
 
 class RedisPublisher {
 public:
@@ -245,14 +236,11 @@ private:
     int fd_ = -1;
 };
 
-// =============================================================================
 // Redpanda/Kafka Publisher (Zero-Dependency)
-// =============================================================================
 // Speaks the Kafka produce protocol (ApiKey=0, ApiVersion=0) directly over TCP.
 // No librdkafka dependency — just raw socket + Kafka wire format.
 // Publishes contest results to the `iicpc.results` topic for downstream
 // consumption (leaderboard updates, audit log, event replay).
-// =============================================================================
 
 class RedpandaPublisher {
 public:

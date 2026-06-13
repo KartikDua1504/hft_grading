@@ -1,6 +1,4 @@
-// =============================================================================
 // sequencer_core.sv — FPGA Order Sequencer Core (SystemVerilog)
-// =============================================================================
 // Deterministic order sequencing in hardware. Assigns strictly monotonic
 // 64-bit sequence numbers to incoming orders with sub-10ns latency.
 //
@@ -13,7 +11,6 @@
 //
 // Target: AMD Xilinx Virtex UltraScale+ (AWS F2)
 // Clock: 250 MHz → 4ns per cycle → <10ns sequencing latency (2-3 cycles)
-// =============================================================================
 
 `timescale 1ns / 1ps
 `default_nettype none
@@ -29,18 +26,14 @@ module sequencer_core #(
     input  wire                     clk,
     input  wire                     rst_n,      // Active-low reset
 
-    // =========================================================================
     // Input ports (one per gateway)
-    // =========================================================================
     input  wire [NUM_PORTS-1:0]             port_valid,     // Order valid
     input  wire [NUM_PORTS-1:0][ORDER_WIDTH-1:0] port_data, // Order payload
     input  wire [NUM_PORTS-1:0][7:0]        port_contestant_id, // Which contestant
     input  wire [NUM_PORTS-1:0][7:0]        port_msg_type,  // ORDER_ENTRY=10, CANCEL=11
     output logic [NUM_PORTS-1:0]            port_ready,     // Backpressure
 
-    // =========================================================================
     // Sequenced output (to DMA ring buffer)
-    // =========================================================================
     output logic                            out_valid,
     output logic [SEQ_WIDTH-1:0]            out_seq_no,
     output logic [TIMESTAMP_W-1:0]          out_timestamp,
@@ -49,18 +42,14 @@ module sequencer_core #(
     output logic [ORDER_WIDTH-1:0]          out_data,
     input  wire                             out_ready,      // Consumer backpressure
 
-    // =========================================================================
     // Status / debug
-    // =========================================================================
     output logic [SEQ_WIDTH-1:0]            stat_total_sequenced,
     output logic [31:0]                     stat_total_drops,
     output logic [NUM_PORTS-1:0]            stat_port_active
 );
 
-    // =========================================================================
     // Free-running timestamp counter (PTP-grade, synced to clock)
     // At 250 MHz: increments every 4ns
-    // =========================================================================
     logic [TIMESTAMP_W-1:0] timestamp_counter;
 
     always_ff @(posedge clk or negedge rst_n) begin
@@ -70,17 +59,12 @@ module sequencer_core #(
             timestamp_counter <= timestamp_counter + 1'b1;
     end
 
-    // =========================================================================
     // Sequence number counter — strictly monotonic
-    // =========================================================================
     logic [SEQ_WIDTH-1:0] seq_counter;
 
-    // =========================================================================
     // Round-Robin Arbiter
-    // =========================================================================
     // Grants one port per cycle. If multiple ports have valid data,
     // round-robin ensures fairness (no starvation).
-    // =========================================================================
     logic [$clog2(NUM_PORTS)-1:0] rr_priority;
     logic [$clog2(NUM_PORTS)-1:0] granted_port;
     logic                          grant_valid;
@@ -116,9 +100,7 @@ module sequencer_core #(
         end
     end
 
-    // =========================================================================
     // Sequencing pipeline — single-cycle assignment
-    // =========================================================================
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
             seq_counter          <= '0;

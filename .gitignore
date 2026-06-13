@@ -1,5 +1,39 @@
+# Build artifacts
+build/
+*.o
+*.a
+*.d
+
+# IDE / Editor
+.cache/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Python
+__pycache__/
+*.pyc
+
+# Redis
+dump.rdb
+
+# Node
+node_modules/
+
+# Infra
 infra/firecracker/contestant_rootfs.ext4
 infra/firecracker/snapshots/snapshot_mem
 infra/terraform/.terraform/
+
+# FPGA
 fpga/build/
 fpga/dump.vcd
+
+# Perf data
+perf.data
+perf.data.old
+*.data
+
+# Results (optional, remove if you want to track)
+# results/

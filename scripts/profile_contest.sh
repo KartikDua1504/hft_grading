@@ -1,7 +1,5 @@
 #!/bin/bash
-# =============================================================================
 # profile_contest.sh — Flamegraph + perf profiling for contest runs
-# =============================================================================
 # Generates:
 #   1. CPU flamegraph (SVG) for the contest pipeline
 #   2. perf stat summary (IPC, cache misses, branch misses)
@@ -10,7 +8,6 @@
 #
 # Usage: ./scripts/profile_contest.sh <source.cpp|binary> [--duration 30]
 # Output: build/profiles/<timestamp>/
-# =============================================================================
 
 set -euo pipefail
 
@@ -70,11 +67,31 @@ echo -e "${CYAN}═════════════════════�
 echo -e "  Source:    $SOURCE"
 echo -e "  Duration:  ${DURATION}s"
 echo -e "  Output:    $PROFILE_DIR"
+
+# Detect Alder Lake P-core / E-core topology
+TASKSET_PREFIX=""
+if grep -q "core id" /proc/cpuinfo 2>/dev/null; then
+    P_CORES=""
+    TOTAL_CPUS=$(nproc)
+    for cpu_num in $(seq 0 $((TOTAL_CPUS - 1))); do
+        CORE_ID=$(awk "/^processor\t: ${cpu_num}$/,/^$/{if(/^core id/) print \$4}" /proc/cpuinfo 2>/dev/null)
+        if [[ -n "$CORE_ID" && "$CORE_ID" -lt 24 ]]; then
+            P_CORES="$P_CORES $cpu_num"
+        fi
+    done
+    P_CORES_TRIMMED=$(echo $P_CORES | xargs)
+    # If we found both P-cores and have more CPUs than P-cores, it's hybrid
+    P_COUNT=$(echo $P_CORES_TRIMMED | wc -w)
+    if [[ $P_COUNT -lt $TOTAL_CPUS && $P_COUNT -gt 0 ]]; then
+        P_FIRST=$(echo $P_CORES_TRIMMED | awk '{print $1}')
+        P_LAST=$(echo $P_CORES_TRIMMED | awk '{print $NF}')
+        TASKSET_PREFIX="taskset -c ${P_FIRST}-${P_LAST}"
+        echo -e "  Topology:  Hybrid CPU detected — pinning to P-cores [${P_FIRST}-${P_LAST}]"
+    fi
+fi
 echo ""
 
-# =========================================================================
 # 1. perf stat — Hardware counters
-# =========================================================================
 log "Phase 1: Hardware performance counters (perf stat)..."
 
 PERF_AVAILABLE=false
@@ -91,7 +108,7 @@ if $PERF_AVAILABLE; then
 
     perf stat -d -d -d \
         -o "$PROFILE_DIR/perf_stat.txt" \
-        -- "$CONTEST_BINARY" $BINARY_ARG \
+        -- $TASKSET_PREFIX "$CONTEST_BINARY" $BINARY_ARG \
         --duration "$DURATION" \
         --no-firecracker \
         $EXTRA_ARGS \
@@ -117,17 +134,15 @@ else
     warn "perf not available — skipping hardware counters"
     # Run contest directly for timing
     if [[ -x "$SOURCE" ]]; then
-        "$CONTEST_BINARY" --binary "$SOURCE" --duration "$DURATION" --no-firecracker $EXTRA_ARGS \
+        $TASKSET_PREFIX "$CONTEST_BINARY" --binary "$SOURCE" --duration "$DURATION" --no-firecracker $EXTRA_ARGS \
             2>"$PROFILE_DIR/contest_stderr.txt" || true
     else
-        "$CONTEST_BINARY" --source "$SOURCE" --duration "$DURATION" --no-firecracker $EXTRA_ARGS \
+        $TASKSET_PREFIX "$CONTEST_BINARY" --source "$SOURCE" --duration "$DURATION" --no-firecracker $EXTRA_ARGS \
             2>"$PROFILE_DIR/contest_stderr.txt" || true
     fi
 fi
 
-# =========================================================================
 # 2. Flamegraph — CPU sampling profile
-# =========================================================================
 log "Phase 2: CPU flamegraph generation..."
 
 FLAMEGRAPH_DIR=""
@@ -151,7 +166,7 @@ if $PERF_AVAILABLE; then
     # Record at 999Hz for duration
     perf record -F 999 -g --call-graph dwarf \
         -o "$PROFILE_DIR/perf.data" \
-        -- "$CONTEST_BINARY" $BINARY_ARG \
+        -- $TASKSET_PREFIX "$CONTEST_BINARY" $BINARY_ARG \
         --duration "$DURATION" \
         --no-firecracker \
         $EXTRA_ARGS \
@@ -194,9 +209,7 @@ else
     warn "perf not available — skipping flamegraph"
 fi
 
-# =========================================================================
 # 3. Memory profiling
-# =========================================================================
 log "Phase 3: Memory profiling..."
 
 # Capture HugePages info
@@ -216,9 +229,7 @@ else
     warn "HugePages: 0 allocated (run harden_determinism.sh for production)"
 fi
 
-# =========================================================================
 # 4. Latency distribution analysis
-# =========================================================================
 log "Phase 4: Latency analysis from contest output..."
 
 {
@@ -234,9 +245,7 @@ log "Phase 4: Latency analysis from contest output..."
 
 ok "Latency analysis → $PROFILE_DIR/latency_analysis.txt"
 
-# =========================================================================
 # 5. CPU topology + scheduling analysis
-# =========================================================================
 log "Phase 5: System topology..."
 
 {
@@ -258,9 +267,7 @@ log "Phase 5: System topology..."
 
 ok "System topology → $PROFILE_DIR/system_topology.txt"
 
-# =========================================================================
 # Summary
-# =========================================================================
 echo ""
 echo -e "${CYAN}═══════════════════════════════════════════════════════════════${NC}"
 echo -e "${CYAN}                    PROFILING COMPLETE                        ${NC}"

@@ -1,7 +1,5 @@
 #!/bin/bash
-# =============================================================================
 # post_contest_test.sh — CF-Style Post-Contest System Testing
-# =============================================================================
 # Orchestrates the full post-contest rejudge flow:
 #   1. Freeze leaderboard (set competition state = "system_testing")
 #   2. For each team's best submission:
@@ -21,7 +19,6 @@
 #   --engine PATH     Path to run_contest binary
 #   --no-firecracker  Run without VM isolation
 #   --report PATH     Output report path (default: results/system_test_report.md)
-# =============================================================================
 
 set -euo pipefail
 
@@ -61,14 +58,10 @@ while [[ $# -gt 0 ]]; do
 done
 
 echo ""
-echo -e "${BOLD}╔══════════════════════════════════════════════════════════════╗${NC}"
-echo -e "${BOLD}║   IICPC Post-Contest System Testing (CF-Style Rejudge)     ║${NC}"
-echo -e "${BOLD}╚══════════════════════════════════════════════════════════════╝${NC}"
+echo -e "${BOLD}--- IICPC Post-Contest System Testing ---${NC}"
 echo ""
 
-# =============================================================================
 # Step 1: Preflight checks
-# =============================================================================
 log "Step 1: Preflight checks..."
 
 if [[ ! -f "$ENGINE" ]]; then
@@ -86,9 +79,7 @@ else
     warn "API server not responding (running in offline mode)"
 fi
 
-# =============================================================================
 # Step 2: Freeze competition
-# =============================================================================
 log "Step 2: Freezing competition..."
 
 # Try to set competition state to system_testing via API
@@ -101,9 +92,7 @@ else
     warn "Could not freeze via API — proceeding anyway"
 fi
 
-# =============================================================================
 # Step 3: Trigger system tests via API (if API is available)
-# =============================================================================
 log "Step 3: Triggering system tests..."
 
 TRIGGER=$(curl -sf -X POST "$API_BASE/api/admin/system-test" \
@@ -148,9 +137,7 @@ if echo "$TRIGGER" | grep -q '"running"'; then
 else
     warn "API trigger failed — running system tests locally"
 
-    # =============================================================================
     # Offline mode: run system tests directly via CLI
-    # =============================================================================
     log "Running system tests in offline mode..."
 
     mkdir -p "$PROJECT_ROOT/results"
@@ -192,9 +179,7 @@ else
     fi
 fi
 
-# =============================================================================
 # Step 4: Generate report
-# =============================================================================
 log "Step 4: Generating system test report..."
 
 mkdir -p "$(dirname "$REPORT_PATH")"
@@ -278,9 +263,7 @@ FOOTER
 
 pass "Report written to: $REPORT_PATH"
 
-# =============================================================================
 # Step 5: Fetch final leaderboard
-# =============================================================================
 log "Step 5: Final leaderboard..."
 
 LEADERBOARD=$(curl -sf "$API_BASE/api/leaderboard" 2>/dev/null || echo '[]')
@@ -288,9 +271,7 @@ LB_COUNT=$(echo "$LEADERBOARD" | python3 -c "import sys,json; print(len(json.loa
 
 if [[ "$LB_COUNT" -gt 0 ]]; then
     echo ""
-    echo -e "${BOLD}╔══════════════════════════════════════════════════════════════╗${NC}"
-    echo -e "${BOLD}║                 FINAL STANDINGS (Post System Test)          ║${NC}"
-    echo -e "${BOLD}╠══════════════════════════════════════════════════════════════╣${NC}"
+echo -e "${BOLD}--- Final Standings (Post System Test) ---${NC}"
 
     python3 -c "
 import sys, json
@@ -299,15 +280,12 @@ for entry in lb[:20]:
     rank = entry.get('rank', '?')
     team = entry.get('team_name', '?')
     score = entry.get('score', 0)
-    print(f'║  #{rank:>2}  {team:<30}  {score:>10.4f}  ║')
+    print(f'  #{rank:>2}  {team:<30}  {score:>10.4f}')
 " 2>/dev/null || echo "  Could not parse leaderboard"
 
-    echo -e "${BOLD}╚══════════════════════════════════════════════════════════════╝${NC}"
 fi
 
-# =============================================================================
 # Summary
-# =============================================================================
 echo ""
 echo -e "${CYAN}═══════════════════════════════════════════════════════${NC}"
 echo -e "${CYAN}  Post-Contest System Testing Complete${NC}"

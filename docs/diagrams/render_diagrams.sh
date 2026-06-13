@@ -1,7 +1,5 @@
 #!/bin/bash
-# =============================================================================
 # render_diagrams.sh — Render all Mermaid diagrams to SVG + PNG
-# =============================================================================
 # Produces both SVG (for README/docs embedding) and PNG (for PDF/print).
 #
 # Prerequisites:
@@ -9,7 +7,6 @@
 #
 # Usage:
 #   bash docs/diagrams/render_diagrams.sh
-# =============================================================================
 
 set -uo pipefail
 

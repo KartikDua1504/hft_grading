@@ -1,7 +1,5 @@
 #pragma once
-// =============================================================================
 // compiler_service.hpp — Compile Contestant C++ Code
-// =============================================================================
 // Takes contestant source code, compiles it with GCC inside an Alpine Docker
 // container, produces a statically-linked musl binary.
 //
@@ -12,7 +10,6 @@
 //   -I/sdk/include (our protocol headers)
 //   -Wall -Werror (no warnings allowed)
 //   Timeout: 30 seconds
-// =============================================================================
 
 #include <chrono>
 #include <cstdio>
@@ -42,9 +39,7 @@ struct CompileResult {
 
 class CompilerService {
 public:
-    // =========================================================================
     // Compile contestant code
-    // =========================================================================
     static CompileResult compile(const CompileConfig& cfg) noexcept {
         CompileResult result{};
 

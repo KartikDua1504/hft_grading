@@ -1,10 +1,7 @@
-// =============================================================================
 // dummy_exchange.cpp — Simple TCP Echo Exchange for Stage 1 Validation
-// =============================================================================
 // Accepts connections, reads BenchmarkMessages, echoes AckMessages.
 // Uses epoll for concurrent connection handling on a single thread.
 // Pinned to a dedicated core for consistent latency measurement.
-// =============================================================================
 
 #include "core/types.hpp"
 #include "loadgen/payload_gen.hpp"

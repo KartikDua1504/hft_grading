@@ -1,13 +1,10 @@
 #pragma once
-// =============================================================================
-// types.hpp — Cache-line aligned primitives and SoA helpers
-// =============================================================================
-// The foundational type system. Every struct here is designed to be
-// mechanically sympathetic to the Intel Alder Lake cache hierarchy:
+
+// --- Cache-Line Aligned Primitives and SoA Helpers ---
+// Foundational type system designed for Intel Alder Lake cache hierarchy:
 //   L1d: 48 KiB/core (P-core), 64-byte lines
 //   L2:  1.25 MiB/P-core
 //   L3:  24 MiB shared
-// =============================================================================
 
 #include <atomic>
 #include <cstddef>
@@ -18,30 +15,28 @@ namespace iicpc {
 
 // --- Hardware Constants (compile-time) ---
 
-/// Intel cache line size. This is the atomic unit of memory the CPU fetches.
+/// Intel cache line size — atomic unit of CPU memory fetch.
 /// False sharing occurs when two threads write to the same cache line.
 inline constexpr std::size_t CACHE_LINE_SIZE = 64;
 
 /// Huge page size (2 MiB). Used for TLB-friendly arena allocations.
 inline constexpr std::size_t HUGE_PAGE_SIZE = 2 * 1024 * 1024;
 
-/// Default arena size: 2 GiB as specified.
+/// Default arena size: 2 GiB.
 inline constexpr std::size_t DEFAULT_ARENA_SIZE = 2ULL * 1024 * 1024 * 1024;
 
-/// Maximum bots in the fleet. Power of 2 is not required here but SoA arrays
-/// are sized to this.
-inline constexpr std::size_t MAX_BOTS = 131072; // 128k, > 100k target
+/// Maximum bots in the fleet. SoA arrays are sized to this.
+inline constexpr std::size_t MAX_BOTS = 131072; // 128k
 
 // --- Cache-Line Padded Atomic ---
-// Wraps an atomic value in its own cache line. This is the canonical
-// false-sharing prevention pattern. Used for SPSC ring buffer indices.
+// Wraps an atomic in its own cache line to prevent false sharing.
+// Used for SPSC ring buffer indices.
 
 template<typename T>
 struct alignas(CACHE_LINE_SIZE) PaddedAtomic {
     std::atomic<T> value{0};
 
-    // Intentional padding to fill the cache line
-    // sizeof(atomic<T>) is typically 8 bytes, padding fills remaining 56
+    // Padding to fill the cache line
     char _pad[CACHE_LINE_SIZE - sizeof(std::atomic<T>)];
 
     // Convenience accessors preserving memory order semantics
@@ -65,8 +60,8 @@ static_assert(alignof(PaddedAtomic<uint64_t>) == CACHE_LINE_SIZE,
     "PaddedAtomic must be aligned to cache line boundary");
 
 // --- Cache-Line Aligned Storage ---
-// For non-atomic data that still needs cache-line alignment (e.g., per-thread
-// counters, SoA array heads).
+// For non-atomic data that still needs cache-line alignment
+// (e.g., per-thread counters, SoA array heads).
 
 template<typename T>
 struct alignas(CACHE_LINE_SIZE) CacheAligned {
@@ -96,7 +91,7 @@ static_assert(sizeof(LatencySample) == 24, "LatencySample must be tightly packed
 static_assert(std::is_trivially_copyable_v<LatencySample>,
     "LatencySample must be trivially copyable for lock-free ring buffer");
 
-// --- Concept constraints for ring buffer element types ---
+// --- Ring buffer element concept ---
 template<typename T>
 concept RingBufferElement = std::is_trivially_copyable_v<T>
                          && std::is_trivially_destructible_v<T>

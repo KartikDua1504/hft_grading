@@ -81,9 +81,7 @@
   <meta name="description" content="An institutional-grade benchmarking platform for competitive orderbook engineering. Submit your C++ engine, get scored on correctness, throughput, and latency." />
 </svelte:head>
 
-<!-- ============================================================ -->
 <!-- HERO — FULL VIEWPORT CINEMATIC INTRO                         -->
-<!-- ============================================================ -->
 <div class="relative min-h-screen overflow-hidden bg-[var(--bg-void)]">
   <!-- Animated grid background -->
   <div class="absolute inset-0 transition-opacity duration-[2000ms] {phase >= 1 ? 'opacity-100' : 'opacity-0'}">
@@ -149,9 +147,7 @@
   </div>
 </div>
 
-<!-- ============================================================ -->
 <!-- LIVE STATS BAR                                                -->
-<!-- ============================================================ -->
 {#if phase >= 5}
 <div class="border-t border-b border-[var(--border)] bg-[var(--bg-deep)] py-6 px-6 overflow-hidden">
   <div class="max-w-5xl mx-auto flex items-center justify-center gap-12 md:gap-20">
@@ -177,9 +173,7 @@
   </div>
 </div>
 
-<!-- ============================================================ -->
 <!-- HOW IT WORKS — CINEMATIC CARDS                               -->
-<!-- ============================================================ -->
 <section class="relative py-28 md:py-36 px-6 bg-cosmic overflow-hidden">
   <!-- Background effects -->
   <div class="absolute inset-0 bg-grid opacity-30 pointer-events-none"></div>
@@ -284,9 +278,7 @@
   </div>
 </section>
 
-<!-- ============================================================ -->
 <!-- ARCHITECTURE SHOWCASE                                        -->
-<!-- ============================================================ -->
 <section class="relative py-28 md:py-36 px-6 bg-[var(--bg-void)] overflow-hidden">
   <!-- Dramatic background -->
   <div class="absolute inset-0 pointer-events-none">
@@ -418,9 +410,7 @@
   </div>
 </section>
 
-<!-- ============================================================ -->
 <!-- TECH STACK TICKER                                            -->
-<!-- ============================================================ -->
 <div class="border-t border-b border-[var(--border)] bg-[var(--bg-deep)] py-4 overflow-hidden">
   <div class="flex items-center gap-8 whitespace-nowrap" style="animation: ticker 30s linear infinite;">
     {#each ['C++23', 'io_uring', 'HugePages', 'Firecracker', 'gRPC', 'Protobuf', 'QuestDB', 'Redis', 'Redpanda', 'SvelteKit', 'FastAPI', 'Terraform', 'Docker', 'cgroups v2', 'seccomp', 'CPU Pinning', 'C++23', 'io_uring', 'HugePages', 'Firecracker', 'gRPC', 'Protobuf', 'QuestDB', 'Redis', 'Redpanda', 'SvelteKit', 'FastAPI', 'Terraform'] as tech}
@@ -430,9 +420,7 @@
   </div>
 </div>
 
-<!-- ============================================================ -->
 <!-- CTA SECTION                                                  -->
-<!-- ============================================================ -->
 <section class="relative py-28 md:py-36 px-6 bg-cosmic overflow-hidden text-center">
   <div class="absolute inset-0 pointer-events-none">
     <div class="absolute w-[600px] h-[600px] rounded-full blur-[120px] opacity-[0.04] left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"
@@ -458,9 +446,7 @@
   </div>
 </section>
 
-<!-- ============================================================ -->
 <!-- FOOTER                                                       -->
-<!-- ============================================================ -->
 <footer class="border-t border-[var(--border)] py-8 px-6 bg-[var(--bg-void)]">
   <div class="max-w-5xl mx-auto">
     <div class="flex flex-col md:flex-row items-center justify-between gap-6">

@@ -1,8 +1,6 @@
-# Building a High-Performance Orderbook Testing Arena
+# IICPC — System Architecture Reference
 
-## A Complete Engineering Reference
-
-**From First Principles to 14 Million Transactions Per Second**
+## High-Performance Orderbook Testing Arena
 
 ---
 
@@ -28,6 +26,7 @@
 18. [The Build System & Deployment](#chapter-18-the-build-system)
 19. [Complete File Blueprint](#chapter-19-complete-file-blueprint)
 20. [Post-Contest System Testing](#chapter-20-post-contest-system-testing)
+21. [Engineering Roadmap](#chapter-21-engineering-roadmap)
 
 ---
 
@@ -35,19 +34,19 @@
 
 ## What Are We Building?
 
-We are **not** building an exchange. We are building a **testing arena** — a platform that takes a contestant's orderbook matching engine (written in C++), sandboxes it, and stress-tests it with millions of deterministic orders to measure three things:
+The system is a **testing arena** — a platform that takes a contestant's orderbook matching engine (written in C++), sandboxes it in a Firecracker µVM, and stress-tests it with millions of deterministic orders. Three metrics are measured:
 
 1. **Correctness** (40%): Does the engine match orders according to price-time priority? Every fill is validated against a deterministic reference implementation.
 2. **Throughput** (30%): How many orders per second can the engine process under sustained load?
 3. **Latency** (30%): What is the 99th percentile round-trip time from order submission to response?
 
-## Why This Is Hard
+## Design Constraints
 
-A naive implementation would use `std::map` for the orderbook, `std::mutex` for synchronization, `new`/`delete` for allocation, and `gettimeofday()` for timing. Such an implementation would achieve perhaps 100,000 orders per second with 50µs latency. We need **100x better**.
+A baseline implementation using `std::map`, `std::mutex`, heap allocation, and `gettimeofday()` achieves approximately 100K orders/sec with 50µs latency. The target is 10M+ orders/sec — a 100x improvement requiring hardware-sympathetic design throughout.
 
-The difficulty is not algorithmic — a matching engine is conceptually simple (two sorted lists, match when they overlap). The difficulty is **mechanical sympathy**: making the code cooperate with the CPU's cache hierarchy, branch predictor, memory controller, and OS scheduler to achieve nanosecond-level performance.
+The algorithmic complexity of a matching engine is low (two sorted lists, match when they overlap). The engineering complexity lies in **mechanical sympathy**: structuring code and data to cooperate with the CPU's cache hierarchy, branch predictor, memory controller, and OS scheduler.
 
-Every design choice documented here exists to eliminate a specific source of latency or jitter. Nothing is accidental.
+Every design choice documented here addresses a specific, measurable source of latency or jitter.
 
 ---
 
@@ -114,17 +113,15 @@ Every design choice documented here exists to eliminate a specific source of lat
 
 **File**: `core/include/core/arena.hpp`, `core/src/arena.cpp`
 
-## Why Not malloc/new?
+## Allocation Overhead: malloc vs. Bump Allocator
 
-`malloc()` is a general-purpose allocator. It maintains free lists, handles fragmentation, uses mutexes for thread safety, and makes syscalls (`brk`/`mmap`) when it runs out of memory. Each of these operations adds latency and non-determinism:
+`malloc()` maintains free lists, handles fragmentation, uses mutexes for thread safety, and makes syscalls (`brk`/`mmap`) when its pool is exhausted. Each operation adds latency and non-determinism:
 
 | Operation | Latency |
 |-----------|---------|
 | `malloc(64)` (cached) | ~25ns |
 | `malloc(64)` (uncached, needs `brk`) | ~1000ns |
-| Arena bump allocation | **0.3ns** |
-
-That's an **83x improvement** in the best case, **3333x** in the worst.
+| Arena bump allocation | 0.3ns |
 
 ## How the Arena Works
 
@@ -484,9 +481,9 @@ Traditional OOP uses `virtual` functions and vtables for polymorphism. On every 
 On Alder Lake:
 - vtable lookup: ~5ns (L1 hit) to ~40ns (L3, if evicted by other data)
 - Indirect branch misprediction: ~15 cycle penalty
-- Inlining blocked: the compiler can't see through the indirection
+- Inlining blocked: the compiler cannot see through the indirection
 
-At 14M operations/sec, every nanosecond matters. 40ns × 14M = 560ms/sec wasted.
+At 14M ops/sec, 40ns per virtual call translates to 560ms/sec of overhead.
 
 ## CRTP: The Curiously Recurring Template Pattern
 
@@ -514,7 +511,7 @@ class PipelineEngine : public EngineBase<PipelineEngine> {
 
 The `static_cast<Derived&>(*this)` is resolved by the compiler at template instantiation. There is no vtable, no indirection, no function pointer. The call to `do_send_impl` is replaced with the actual function body inline.
 
-**Cost: literally zero.** The generated assembly is identical to if you'd written the code directly.
+The generated assembly is identical to a direct (non-polymorphic) call — zero runtime overhead.
 
 We use three CRTP bases:
 - `EngineBase<D>`: For IO engines (send/recv loop)
@@ -606,7 +603,7 @@ Why not `double`? Floating point has rounding errors. In financial systems, $0.1
 
 ## What It Does
 
-The Order Blaster is the "firehose" — it generates a realistic stream of exchange orders at 10M+ per second. It simulates:
+The Order Blaster generates a deterministic stream of exchange orders at 10M+ per second. The order mix simulates:
 - **Limit orders** (60%): Buy/sell at specific prices around a random-walking midpoint
 - **Market orders** (20%): Immediate execution at any price
 - **Cancel requests** (20%): Remove previously placed limit orders
@@ -710,7 +707,7 @@ The `release` on `write_pos.store` guarantees that the data write (`data[w & MAS
 
 ### Power-of-2 Capacity: Why?
 
-`w & MASK` replaces `w % Capacity`. Modulo is a division instruction (~30 cycles on Alder Lake). Bitwise AND is 1 cycle. At 14M operations/sec, this saves 400ms/sec.
+`w & MASK` replaces `w % Capacity`. Modulo requires a division instruction (~30 cycles on Alder Lake). Bitwise AND is 1 cycle. At 14M ops/sec, this eliminates ~400ms/sec of compute overhead.
 
 ```cpp
 template<typename T, size_t Capacity>
@@ -740,11 +737,9 @@ void* ptr = mmap(nullptr, total_size, PROT_READ | PROT_WRITE,
 
 **File**: `exchange/include/exchange/shadow_orderbook.hpp`
 
-## The Correctness Problem
+## Reference Validation
 
-We blast 10 million orders at the contestant's code. How do we know if their matching engine got the right answers?
-
-The Shadow Orderbook is a **deterministic reference implementation** that runs on the host, processing the **exact same order stream** as the contestant. Because the Order Blaster is seeded (`seed=12345`), the shadow receives identical input and produces the expected set of fills.
+The Shadow Orderbook is a **deterministic reference implementation** running on the host, processing the **identical order stream** as the contestant. Because the Order Blaster uses a fixed seed, the shadow receives identical input and produces the expected set of fills.
 
 When the contestant returns their fills, we diff:
 
@@ -1513,13 +1508,10 @@ The aggregate `system_score` is the sum of all weighted scores (0.0 - 1.0).
 Contestants see ONLY:
 
 ```
-╔══════════════════════════════════════════════════════════════╗
-║            SYSTEM TEST RESULTS: team_alpha                  ║
-╠══════════════════════════════════════════════════════════════╣
-║  Scenarios Passed:  7 / 10                                  ║
-║  System Score:      0.7820                                  ║
-║  Final Score:       0.8292                                  ║
-╚══════════════════════════════════════════════════════════════╝
+--- System Test Results: team_alpha ---
+  Scenarios Passed:  7 / 10
+  System Score:      0.7820
+  Final Score:       0.8292
 ```
 
 They do NOT see which scenarios failed or what each scenario tests. This prevents teams from reverse-engineering the test suite between rounds.
@@ -1541,7 +1533,7 @@ The full rejudge flow:
 5. Broadcast final leaderboard
 ```
 
-The frontend shows a live banner: `🔬 System Tests Running — 3/15` during the rejudge, then switches the leaderboard header to "Final Standings" with a `SYSTEM TESTED` badge.
+The frontend displays a progress indicator during the rejudge, then updates the leaderboard header to "Final Standings" with a `SYSTEM TESTED` badge.
 
 ---
 
@@ -1562,5 +1554,318 @@ The frontend shows a live banner: `🔬 System Tests Running — 3/15` during th
 
 ---
 
-*This document describes a system that achieves 13.99 million transactions per second with sub-microsecond p99 latency on commodity hardware. Every design decision — from the memory allocator to the wire protocol to the CPU core map — exists to eliminate a measurable source of latency or non-determinism. Nothing is accidental.*
+# Chapter 21: Engineering Roadmap
+
+The following are concrete, implementable improvements prioritized by expected impact. Each entry specifies the engineering effort, the files affected, and the measurable outcome. Estimated scope assumes a single engineer with existing codebase familiarity.
+
+---
+
+## 1. FPGA ↔ Host PCIe DMA Integration
+
+**Effort**: 4–6 weeks  
+**Status**: FPGA matching engine verified in Verilator simulation. `dma_ring.sv` defines the FPGA-side ring buffer. Host-side PCIe BAR driver does not exist.
+
+**What is missing**:
+
+The pipeline currently terminates at `dma_ring.sv`. The host CPU has no driver to map the PCIe BAR, read sequenced orders from the DMA ring, or write fill responses back to the FPGA. The full datapath requires:
+
+1. **Host-side MMIO driver** — `mmap()` the PCIe BAR into userspace via `sysfs` resource files (`/sys/bus/pci/devices/.../resource0`). Poll the FPGA write pointer, consume orders from the ring, advance the host read pointer via MMIO write.
+
+2. **FPGA → Host interrupt coalescing** — The current `dma_ring.sv` raises `irq_out` on every write. At 246M orders/sec, that is 246M interrupts/sec — the host cannot service this. Implement a coalescing timer (e.g., fire interrupt every 1µs or every 64 orders, whichever comes first).
+
+3. **Host → FPGA fill path** — A second DMA ring (host writes fills, FPGA reads) for closing the loop. The current design is unidirectional.
+
+4. **AWS Shell integration** — Connect `sequencer_top.sv` to the AWS `cl_dram_dma` shell interface. Map AXI-lite registers for control (start/stop/reset) and AXI4 for bulk DMA.
+
+```
+Files:
+  [NEW] fpga/host_driver/pcie_bar_driver.hpp    — Userspace MMIO mapping
+  [NEW] fpga/host_driver/fpga_ring_consumer.hpp  — Host-side ring consumer
+  [MOD] fpga/rtl/dma_ring.sv                     — Interrupt coalescing
+  [NEW] fpga/rtl/dma_ring_fill.sv                — Host → FPGA fill ring
+  [MOD] fpga/rtl/sequencer_top.sv                — AWS Shell AXI integration
+```
+
+**Measurable outcome**: End-to-end FPGA-accelerated contest run where the FPGA handles sequencing + matching at 246M orders/sec while the host handles only scoring and telemetry.
+
+---
+
+## 2. io_uring Transport Engine (Completion)
+
+**Effort**: 2–3 weeks  
+**Status**: `io_engine.hpp` declares the io_uring path. `io_engine.cpp` falls back to `epoll` unconditionally. The io_uring code path is stubbed.
+
+**What to implement**:
+
+- **Registered buffers** (`io_uring_register_buffers`) — Pre-register the `PayloadGen` arena buffers with the kernel. Eliminates per-syscall `copy_from_user` on the send path. Expected improvement: ~200ns per send.
+
+- **Fixed file descriptors** (`io_uring_register_files`) — Register all bot socket FDs upfront. The kernel skips `fdget`/`fdput` on each SQE, saving ~50ns per operation.
+
+- **SQPOLL mode** — Dedicate a kernel thread to poll the submission queue. Eliminates the `io_uring_enter()` syscall entirely from the hot path. The user thread writes SQEs and the kernel thread submits them autonomously.
+
+- **Batched completions** — Drain CQEs in batches of 64 using `io_uring_peek_batch_cqe()`. Process all completions before submitting the next batch.
+
+```
+Files:
+  [MOD] loadgen/src/io_engine.cpp                — Full io_uring implementation
+  [MOD] loadgen/include/loadgen/io_engine.hpp     — io_uring config (SQPOLL, ring depth)
+  [NEW] bench/bench_iouring.cpp                   — io_uring vs. epoll vs. SHM comparison
+```
+
+**Measurable outcome**: io_uring engine should close the gap between the epoll engine (~2M TPS) and the SHM engine (~15.8M TPS). Target: 8–12M TPS with full kernel bypass on the submission side.
+
+---
+
+## 3. Speculative Execution: FPGA-Assisted Pre-Computation (FA-SRE)
+
+**Effort**: 4–5 weeks  
+**Status**: Research design documented. RTL speculative parser not implemented. Software-side transactional sandbox not implemented.
+
+**Architecture**:
+
+The core insight is that PCIe round-trip latency (~1.5µs) dominates the FPGA-accelerated path. While orders transit the PCIe bus, the software engine can **speculatively pre-compute** the expected matching result. When the FPGA result arrives:
+
+- **Speculation correct (expected ~75–95% of cases)**: Commit the pre-computed result immediately. Effective latency = 0 (masked by PCIe transit).
+- **Speculation incorrect**: Roll back the software state and apply the FPGA's authoritative result. Rollback cost: ~200ns.
+
+**Implementation requires**:
+
+1. **RTL speculative parser** (`order_parser_spec.sv`) — Duplicates the order stream to both the main FPGA pipeline and a PCIe-side sideband that sends a speculative prediction to the host before the full match completes.
+
+2. **Transactional orderbook sandbox** (`speculative_orderbook.hpp`) — A copy-on-write snapshot of the shadow orderbook that supports atomic commit/rollback. Uses a small changelog buffer (arena-allocated) to track speculative mutations.
+
+3. **Misprediction sweep benchmark** — Parameterized benchmark that varies the crossing rate from 0% to 25% to measure the break-even point where speculation overhead exceeds the latency savings.
+
+```
+Files:
+  [NEW] fpga/rtl/order_parser_spec.sv            — Speculative sideband parser
+  [NEW] exchange/include/exchange/speculative_orderbook.hpp — CoW transactional sandbox
+  [NEW] bench/bench_speculation.cpp              — Misprediction sweep (0–25%)
+```
+
+**Measurable outcome**: At ≤10% misprediction rate, effective match latency drops from ~1.5µs (PCIe round-trip) to <100ns (speculative commit). Quantified via the misprediction sweep.
+
+---
+
+## 4. Multi-Instrument Orderbook
+
+**Effort**: 3–4 weeks  
+**Status**: All current code is single-instrument. `OrderBook`, `ShadowOrderbook`, `OrderBlaster`, and `MatchEngine` operate on a single implicit instrument.
+
+**What to implement**:
+
+- **Instrument-partitioned orderbooks** — One `OrderBook` instance per instrument, allocated from the same arena. Instrument ID indexing via a flat array (not a hash map — instrument count is bounded and known at compile time).
+
+- **Cross-instrument market data** — The `MarketDataGen` produces correlated price streams across instruments using a covariance matrix. This tests whether contestants handle multi-instrument state correctly.
+
+- **Per-instrument blaster state** — `BlasterState` becomes `BlasterState[N_INSTRUMENTS]`. The order blaster round-robins across instruments, weighted by a configurable activity distribution.
+
+- **Risk aggregation** — Position limits become portfolio-level. A contestant at +100 on instrument A and -100 on instrument B has net exposure of 0, not 200. This tests portfolio-aware risk management.
+
+```
+Files:
+  [MOD] exchange/include/exchange/orderbook.hpp       — Instrument ID field, per-instrument instances
+  [MOD] exchange/include/exchange/match_engine.hpp     — Instrument dispatch, portfolio PnL
+  [MOD] exchange/include/exchange/shadow_orderbook.hpp — Per-instrument validation
+  [MOD] loadgen/include/loadgen/order_blaster.hpp      — Multi-instrument generation
+  [MOD] sdk/include/sdk/protocol.hpp                   — instrument_id in MarketUpdate, OrderEntry
+```
+
+**Measurable outcome**: Support for 4–16 instruments per contest. Tests that contestants maintain separate book state and handle cross-instrument correlation without data corruption.
+
+---
+
+## 5. Deterministic Replay Engine
+
+**Effort**: 2–3 weeks  
+**Status**: `AuditLog` records all events. `CorrectnessValidator` replays the log for post-hoc validation. No standalone replay binary exists.
+
+**What to implement**:
+
+- **Standalone replay tool** (`tools/replay_contest.cpp`) — Reads a binary audit log, replays the exact order sequence through a fresh `ShadowOrderbook`, and produces a fill-by-fill diff against the recorded fills. Enables offline debugging of contestant edge cases without re-running the full pipeline.
+
+- **Deterministic time reconstruction** — The audit log records TSC timestamps. The replay tool reconstructs wall-clock time using the calibrated TSC frequency, enabling latency analysis of historical runs.
+
+- **Partial replay with breakpoints** — Replay up to order N, then dump the full orderbook state (all price levels, resting orders, BBO). This enables binary-search debugging: "the bug manifests somewhere between order 4,000,000 and 5,000,000."
+
+```
+Files:
+  [NEW] tools/replay_contest.cpp           — Standalone replay binary
+  [MOD] exchange/include/exchange/audit_log.hpp — Seekable read (jump to order N)
+  [NEW] tools/dump_orderbook_state.hpp     — Orderbook state serialization
+```
+
+**Measurable outcome**: Any contestant failure can be reproduced and debugged offline from the audit log alone, without the full infrastructure stack running.
+
+---
+
+## 6. Live Telemetry Streaming (WebSocket)
+
+**Effort**: 2 weeks  
+**Status**: WebSocket exists (`/ws/live`) for leaderboard updates. No real-time telemetry streaming during an active contest run.
+
+**What to implement**:
+
+- **Live latency histogram** — During a contest run, the telemetry consumer periodically (every 100ms) snapshots the HDR histogram and publishes percentiles (p50, p90, p99, p99.9, max) over the WebSocket. The frontend renders a real-time latency chart.
+
+- **Live throughput gauge** — Rolling 1-second TPS counter, published alongside the histogram snapshot. The frontend renders a live throughput gauge.
+
+- **Live orderbook depth** — The shadow orderbook publishes top-5 bid/ask price levels and quantities every 500ms. The frontend renders a live depth-of-book visualization.
+
+- **Admin spectator mode** — Admin dashboard shows all active contest runs simultaneously, each with its own telemetry stream.
+
+```
+Files:
+  [MOD] web/backend/main.py                        — Telemetry WebSocket endpoint
+  [MOD] telemetry/include/telemetry/consumer.hpp    — Periodic snapshot publishing
+  [NEW] web/frontend/src/routes/dashboard/live/+page.svelte — Real-time telemetry UI
+  [NEW] web/frontend/src/lib/components/LatencyChart.svelte — HDR histogram chart
+  [NEW] web/frontend/src/lib/components/DepthChart.svelte   — Orderbook depth chart
+```
+
+**Measurable outcome**: Judges and spectators observe latency distribution and throughput evolution in real-time during an active contest run.
+
+---
+
+## 7. Profile-Guided Optimization (PGO) Build Pipeline
+
+**Effort**: 1 week  
+**Status**: Build uses `-O2 -march=x86-64-v3`. No PGO or AutoFDO.
+
+**What to implement**:
+
+PGO uses runtime profiling data to guide compiler optimization decisions. The workflow:
+
+1. **Instrumented build** — Compile with `-fprofile-generate`. Run the full benchmark suite (`bench_shm`, `bench_blaster`, `bench_pipeline`). GCC writes `.gcda` profile data.
+
+2. **Optimized rebuild** — Compile with `-fprofile-use`. GCC uses the profile data to:
+   - Reorder basic blocks for fall-through on hot paths
+   - Inline functions that were frequently called but not inlined at `-O2`
+   - Optimize branch prediction hints based on actual taken/not-taken ratios
+   - Improve register allocation for hot loops
+
+3. **CMake integration** — Add `cmake -DPGO_PHASE=generate` and `cmake -DPGO_PHASE=use` options. The CI pipeline runs both phases automatically.
+
+```
+Files:
+  [MOD] CMakeLists.txt                — PGO phase options, profile data paths
+  [NEW] scripts/pgo_build.sh          — Automated 2-phase PGO build
+```
+
+**Measurable outcome**: Expected 5–15% throughput improvement on the SHM engine hot path. PGO primarily benefits the SPSC ring push/pop and the order blaster batch generation, where branch prediction accuracy is critical.
+
+---
+
+## 8. NUMA-Aware Memory Allocation
+
+**Effort**: 1–2 weeks  
+**Status**: `HugePageArena` allocates from the default NUMA node. No NUMA affinity control.
+
+**What to implement**:
+
+On multi-socket systems (e.g., 2-socket Xeon), memory access to a remote NUMA node costs ~100ns vs. ~40ns for local. The arena should allocate memory on the same NUMA node as the core that will access it.
+
+- **NUMA-aware mmap** — Use `mbind()` with `MPOL_BIND` to pin arena pages to a specific NUMA node. The arena constructor takes a `numa_node` parameter derived from the `CoreMap`.
+
+- **Per-subsystem arenas** — Instead of one global arena, allocate separate arenas per subsystem (blaster, shadow, telemetry), each bound to the NUMA node of its pinned core.
+
+- **Verification** — Use `move_pages()` or `/proc/self/numa_maps` to verify that allocated pages reside on the expected NUMA node.
+
+```
+Files:
+  [MOD] core/include/core/arena.hpp     — numa_node parameter, mbind() call
+  [MOD] core/src/arena.cpp              — NUMA binding implementation
+  [MOD] core/include/core/cpu_affinity.hpp — CoreMap → NUMA node mapping
+```
+
+**Measurable outcome**: On 2-socket systems, eliminates cross-NUMA memory access on the hot path. Expected p99 latency improvement of 15–30% on multi-socket hardware.
+
+---
+
+## 9. Formal Verification of FPGA Matching Logic
+
+**Effort**: 3–4 weeks  
+**Status**: FPGA correctness verified via Verilator simulation testbenches (8 tests). No formal proofs.
+
+**What to implement**:
+
+Simulation tests can only cover a finite number of input sequences. Formal verification proves properties hold for **all possible inputs**.
+
+- **Price-time priority invariant** — Prove that for any sequence of insert/cancel/match operations, the BBO is always the best available price. Use SystemVerilog Assertions (SVA) with `assert property`:
+
+```systemverilog
+property price_time_priority;
+    @(posedge clk) disable iff (rst)
+    (out_valid && out_fill) |->
+        (out_fill_price == best_price_at_time_of_match);
+endproperty
+assert property (price_time_priority);
+```
+
+- **Conservation invariant** — Prove that total buy fill quantity equals total sell fill quantity across all matched trades. No quantity is created or destroyed.
+
+- **No-deadlock proof** — Prove that the pipeline never stalls (i.e., `in_ready` always returns HIGH within a bounded number of cycles after `out_valid` is consumed).
+
+- **Tooling** — Use Synopsys VC Formal, Cadence JasperGold, or the open-source SymbiYosys (based on Yosys + Z3/Boolector).
+
+```
+Files:
+  [NEW] fpga/formal/match_engine_props.sv   — SVA property definitions
+  [NEW] fpga/formal/Makefile                — SymbiYosys build targets
+  [NEW] fpga/formal/conservation.sv         — Quantity conservation proof
+```
+
+**Measurable outcome**: Mathematical proof that the matching engine satisfies price-time priority, quantity conservation, and liveness for all possible input sequences.
+
+---
+
+## 10. Kernel Bypass Networking (AF_XDP)
+
+**Effort**: 4–5 weeks  
+**Status**: All contestant communication uses Unix Domain Sockets via the kernel's VFS layer. Each `send()`/`recv()` requires 2 context switches (user → kernel → user).
+
+**What to implement**:
+
+AF_XDP (eXpress Data Path) provides zero-copy packet I/O from userspace, bypassing the kernel network stack entirely. For the contestant bridge path:
+
+- **AF_XDP socket pool** — One AF_XDP socket per contestant, bound to a dedicated NIC queue (or veth pair for Firecracker). Uses `UMEM` (userspace memory) shared with the NIC DMA engine.
+
+- **Zero-copy ring** — The NIC writes incoming packets directly into the UMEM region. The host reads them without any kernel involvement. Eliminates `recvmsg()` syscalls.
+
+- **XDP program** — A minimal eBPF program running at the NIC driver level routes packets to the correct AF_XDP socket based on the contestant's source port.
+
+- **Graceful fallback** — If the NIC doesn't support AF_XDP (e.g., Firecracker's virtio-net), fall back to UDS transparently. The bridge interface remains the same.
+
+```
+Files:
+  [NEW] sandbox/include/sandbox/xdp_bridge.hpp  — AF_XDP transport layer
+  [NEW] sandbox/src/xdp_bridge.cpp              — UMEM setup, XDP program loading
+  [NEW] sandbox/bpf/iicpc_router.bpf.c          — eBPF XDP routing program
+  [MOD] sandbox/include/sandbox/sandbox_bridge.hpp — Transport abstraction layer
+```
+
+**Measurable outcome**: Contestant round-trip latency drops from ~1–2µs (UDS) to ~200–400ns (AF_XDP zero-copy). The bridge path is no longer the bottleneck for latency measurement.
+
+---
+
+## Priority Matrix
+
+| # | Feature | Effort | Impact on Throughput | Impact on Latency | Impact on Correctness |
+|---|---------|--------|---------------------|-------------------|-----------------------|
+| 1 | PCIe DMA Integration | 6 weeks | High (246M OPS to host) | High (4ns match) | — |
+| 2 | io_uring Completion | 3 weeks | Medium (8–12M TPS) | Medium | — |
+| 3 | Speculative Execution | 5 weeks | — | High (mask PCIe) | — |
+| 4 | Multi-Instrument | 4 weeks | — | — | High (portfolio risk) |
+| 5 | Replay Engine | 3 weeks | — | — | High (debuggability) |
+| 6 | Live Telemetry | 2 weeks | — | — | — (observability) |
+| 7 | PGO Build | 1 week | Medium (5–15%) | Low | — |
+| 8 | NUMA-Aware Alloc | 2 weeks | Low | Medium (multi-socket) | — |
+| 9 | Formal Verification | 4 weeks | — | — | High (proof) |
+| 10 | AF_XDP Bypass | 5 weeks | — | High (200ns RTT) | — |
+
+**Recommended 3-month sequence**: Items 7 → 2 → 5 → 6 → 1 → 4. This ordering front-loads quick wins (PGO, io_uring) before tackling the larger FPGA and multi-instrument efforts.
+
+---
+
+*Every design decision in this system — from the memory allocator to the wire protocol to the CPU core map — addresses a specific, measurable source of latency or non-determinism.*
 

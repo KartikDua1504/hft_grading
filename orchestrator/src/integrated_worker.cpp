@@ -1,6 +1,4 @@
-// =============================================================================
 // integrated_worker.cpp — Full Production Worker
-// =============================================================================
 // Combines all Stage 1 + Stage 2 components into a single binary:
 //   1. Registers with orchestrator (gRPC)
 //   2. Receives benchmark config
@@ -10,8 +8,7 @@
 //   6. Publishes to QuestDB + Redis
 //   7. Reports final results
 //
-// This is the "production" worker that gets deployed to each node.
-// =============================================================================
+// Production worker deployed to each node.
 
 #include <grpcpp/grpcpp.h>
 #include "control.grpc.pb.h"
@@ -111,9 +108,7 @@ static WorkerConfig parse_args(int argc, char* argv[]) {
     return cfg;
 }
 
-// =============================================================================
 // Run a benchmark using the SHM engine (in-process)
-// =============================================================================
 struct BenchmarkResults {
     uint64_t total_sends = 0;
     uint64_t total_recvs = 0;
@@ -266,9 +261,7 @@ static BenchmarkResults run_shm_benchmark(
     return results;
 }
 
-// =============================================================================
 // Main
-// =============================================================================
 int main(int argc, char* argv[]) {
     ::signal(SIGINT, signal_handler);
     ::signal(SIGTERM, signal_handler);
@@ -277,14 +270,10 @@ int main(int argc, char* argv[]) {
     auto cfg = parse_args(argc, argv);
 
     std::fprintf(stderr, "\n");
-    std::fprintf(stderr, "╔══════════════════════════════════════════════════════════╗\n");
-    std::fprintf(stderr, "║   IICPC Integrated Worker                               ║\n");
-    std::fprintf(stderr, "║   Engine + Sandbox + Telemetry Pipeline                  ║\n");
-    std::fprintf(stderr, "╚══════════════════════════════════════════════════════════╝\n\n");
+    std::fprintf(stderr, "--- IICPC Integrated Worker ---\n");
+    std::fprintf(stderr, "--- Engine + Sandbox + Telemetry Pipeline ---\n");
 
-    // =========================================================================
     // 1. Register with orchestrator
-    // =========================================================================
     auto channel = grpc::CreateChannel(cfg.orchestrator_addr,
                                         grpc::InsecureChannelCredentials());
     auto stub = BenchmarkOrchestrator::NewStub(channel);
@@ -311,9 +300,7 @@ int main(int argc, char* argv[]) {
         }
     }
 
-    // =========================================================================
     // 2. Start benchmark via orchestrator
-    // =========================================================================
     {
         BenchmarkConfig bc;
         bc.set_benchmark_id(cfg.benchmark_id);
@@ -331,9 +318,7 @@ int main(int argc, char* argv[]) {
         }
     }
 
-    // =========================================================================
     // 3. Optional: Start Firecracker sandbox
-    // =========================================================================
     FirecrackerManager fc;
     if (cfg.use_firecracker && cfg.kernel_path && cfg.rootfs_path) {
         std::fprintf(stderr, "[worker] Starting Firecracker sandbox...\n");
@@ -350,9 +335,7 @@ int main(int argc, char* argv[]) {
         }
     }
 
-    // =========================================================================
     // 4. Connect telemetry endpoints
-    // =========================================================================
     QuestDBPublisher questdb;
     bool questdb_ok = questdb.connect(cfg.questdb_host, cfg.questdb_port);
 
@@ -362,14 +345,10 @@ int main(int argc, char* argv[]) {
     RedpandaPublisher redpanda;
     bool redpanda_ok = redpanda.connect(cfg.redpanda_host, cfg.redpanda_port);
 
-    // =========================================================================
     // 5. Run benchmark
-    // =========================================================================
     auto results = run_shm_benchmark(cfg, questdb, redis, questdb_ok, redis_ok);
 
-    // =========================================================================
     // 6. Report results to orchestrator
-    // =========================================================================
     {
         BenchmarkHandle handle;
         handle.set_benchmark_id(cfg.benchmark_id);
@@ -404,33 +383,27 @@ int main(int argc, char* argv[]) {
                      redpanda.total_published());
     }
 
-    // =========================================================================
     // 7. Print results
-    // =========================================================================
     std::fprintf(stderr, "\n");
-    std::fprintf(stderr, "╔══════════════════════════════════════════════════════════════╗\n");
-    std::fprintf(stderr, "║             INTEGRATED WORKER RESULTS                       ║\n");
-    std::fprintf(stderr, "╠══════════════════════════════════════════════════════════════╣\n");
-    std::fprintf(stderr, "║  Contestant:   %-44s  ║\n", cfg.contestant_id);
-    std::fprintf(stderr, "║  Duration:     %.2f seconds                                ║\n", results.elapsed_secs);
-    std::fprintf(stderr, "║  TPS:          %-44.0f  ║\n", results.tps);
-    std::fprintf(stderr, "║  Drops:        %-44lu  ║\n", results.drops);
-    std::fprintf(stderr, "║  p50:          %10.2f µs                                   ║\n",
+    std::fprintf(stderr, "--- INTEGRATED WORKER RESULTS ---\n");
+    std::fprintf(stderr, "--- Contestant:   %-44s ---\n", cfg.contestant_id);
+    std::fprintf(stderr, "--- Duration:     %.2f seconds ---\n", results.elapsed_secs);
+    std::fprintf(stderr, "--- TPS:          %-44.0f ---\n", results.tps);
+    std::fprintf(stderr, "--- Drops:        %-44lu ---\n", results.drops);
+    std::fprintf(stderr, "--- p50:          %10.2f µs ---\n",
                  static_cast<double>(results.p50_ns) / 1000.0);
-    std::fprintf(stderr, "║  p99:          %10.2f µs                                   ║\n",
+    std::fprintf(stderr, "--- p99:          %10.2f µs ---\n",
                  static_cast<double>(results.p99_ns) / 1000.0);
-    std::fprintf(stderr, "║  Score:        %-44.2f  ║\n", results.score);
-    std::fprintf(stderr, "║                                                              ║\n");
-    std::fprintf(stderr, "║  [%s] Orchestrator                                         ║\n", "✓");
-    std::fprintf(stderr, "║  [%s] QuestDB (%lu points)                                ║\n",
+    std::fprintf(stderr, "--- Score:        %-44.2f ---\n", results.score);
+    std::fprintf(stderr, "--- [%s] Orchestrator ---\n", "✓");
+    std::fprintf(stderr, "--- [%s] QuestDB (%lu points) ---\n",
                  questdb_ok ? "✓" : "✗", questdb.total_published());
-    std::fprintf(stderr, "║  [%s] Redis leaderboard                                    ║\n",
+    std::fprintf(stderr, "--- [%s] Redis leaderboard ---\n",
                  redis_ok ? "✓" : "✗");
-    std::fprintf(stderr, "║  [%s] Redpanda (%lu events)                                ║\n",
+    std::fprintf(stderr, "--- [%s] Redpanda (%lu events) ---\n",
                  redpanda_ok ? "✓" : "✗", redpanda.total_published());
-    std::fprintf(stderr, "║  [%s] Firecracker sandbox                                  ║\n",
+    std::fprintf(stderr, "--- [%s] Firecracker sandbox ---\n",
                  cfg.use_firecracker ? "✓" : "—");
-    std::fprintf(stderr, "╚══════════════════════════════════════════════════════════════╝\n");
 
     // Cleanup
     if (cfg.use_firecracker) {

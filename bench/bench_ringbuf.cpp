@@ -1,6 +1,4 @@
-// =============================================================================
 // bench_ringbuf.cpp — SPSC Ring Buffer Micro-Benchmark
-// =============================================================================
 #include "core/ring_buffer.hpp"
 #include "core/tsc.hpp"
 #include "core/types.hpp"

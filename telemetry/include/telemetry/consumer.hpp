@@ -1,7 +1,5 @@
 #pragma once
-// =============================================================================
 // consumer.hpp — Dedicated Telemetry Consumer Thread
-// =============================================================================
 #include "core/types.hpp"
 #include "core/ring_buffer.hpp"
 #include "core/hdr_histogram.hpp"

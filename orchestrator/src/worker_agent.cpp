@@ -1,9 +1,6 @@
-// =============================================================================
 // worker_agent.cpp — Benchmark Worker Agent
-// =============================================================================
 // Connects to the orchestrator, receives benchmark configs, runs the
 // Stage 1 engine inside a Firecracker sandbox, and streams metrics back.
-// =============================================================================
 
 #include <grpcpp/grpcpp.h>
 #include "control.grpc.pb.h"
@@ -35,9 +32,7 @@ public:
         stub_ = BenchmarkOrchestrator::NewStub(channel);
     }
 
-    // =========================================================================
     // Register with the orchestrator
-    // =========================================================================
     bool register_worker() {
         WorkerInfo info;
         info.set_worker_id(worker_id_);
@@ -82,9 +77,7 @@ public:
         return true;
     }
 
-    // =========================================================================
     // Heartbeat loop (background thread)
-    // =========================================================================
     void start_heartbeat(std::atomic<bool>& stop_flag) {
         heartbeat_thread_ = std::thread([this, &stop_flag]() {
             while (!stop_flag.load()) {
@@ -100,9 +93,7 @@ public:
         }
     }
 
-    // =========================================================================
     // Send metrics snapshot for a benchmark
-    // =========================================================================
     bool submit_result(const BenchmarkResult& result) {
         BenchmarkHandle handle;
         handle.set_benchmark_id(result.benchmark_id());
@@ -162,9 +153,7 @@ private:
 
 } // namespace iicpc
 
-// =============================================================================
 // Main
-// =============================================================================
 static std::atomic<bool> g_shutdown{false};
 static void signal_handler(int) { g_shutdown.store(true); }
 
@@ -183,11 +172,9 @@ int main(int argc, char* argv[]) {
     }
 
     std::fprintf(stderr, "\n");
-    std::fprintf(stderr, "╔══════════════════════════════════════════════════════════╗\n");
-    std::fprintf(stderr, "║   IICPC Worker Agent                                    ║\n");
-    std::fprintf(stderr, "║   Orchestrator: %-40s  ║\n", orchestrator_addr.c_str());
-    std::fprintf(stderr, "║   Worker ID:    %-40s  ║\n", worker_id.c_str());
-    std::fprintf(stderr, "╚══════════════════════════════════════════════════════════╝\n\n");
+    std::fprintf(stderr, "--- IICPC Worker Agent ---\n");
+    std::fprintf(stderr, "--- Orchestrator: %-40s ---\n", orchestrator_addr.c_str());
+    std::fprintf(stderr, "--- Worker ID:    %-40s ---\n", worker_id.c_str());
 
     iicpc::WorkerAgent agent(orchestrator_addr, worker_id);
 

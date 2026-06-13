@@ -1,7 +1,5 @@
 #pragma once
-// =============================================================================
 // ultra_engine.hpp — Zero-Overhead HFT I/O Engine (CRTP, No Virtual Dispatch)
-// =============================================================================
 // This replaces the virtual IoEngine with compile-time polymorphism (CRTP).
 //
 // Key optimizations vs. EpollIoEngine:
@@ -13,7 +11,6 @@
 //   6. likely/unlikely — branch prediction hints on all hot-path branches
 //   7. Branchless state transitions where possible
 //   8. Template-parameterized batch sizes for compile-time unrolling
-// =============================================================================
 
 #include "core/types.hpp"
 #include "core/tsc.hpp"
@@ -37,9 +34,7 @@
 
 namespace iicpc {
 
-// =============================================================================
 // Compile-time engine configuration
-// =============================================================================
 struct UltraEngineConfig {
     static constexpr std::size_t BATCH_SIZE = 256;
     static constexpr std::size_t EPOLL_MAX_EVENTS = 1024;
@@ -54,9 +49,7 @@ struct UltraEngineConfig {
     std::size_t target_tps = 100'000;
 };
 
-// =============================================================================
 // CRTP Base — compile-time polymorphism, zero overhead
-// =============================================================================
 template<typename Derived>
 class IoEngineBase {
 public:
@@ -76,9 +69,7 @@ protected:
     uint32_t next_seq_ = 0;
 };
 
-// =============================================================================
 // Ultra-Low-Latency Engine
-// =============================================================================
 class UltraEngine : public IoEngineBase<UltraEngine> {
     friend class IoEngineBase<UltraEngine>;
 
@@ -175,9 +166,7 @@ public:
     }
 
 private:
-    // =========================================================================
     // THE HOT PATH — every nanosecond matters here
-    // =========================================================================
     IICPC_HOT IICPC_FLATTEN
     std::size_t run_batch_impl(BotFleet& fleet, TelemetryRing& ring) noexcept {
         // Phase 1: Batch sends with sendmmsg
@@ -187,9 +176,7 @@ private:
         return recv_batch(fleet, ring);
     }
 
-    // =========================================================================
     // Batched send via sendmmsg — N messages in ONE syscall
-    // =========================================================================
     IICPC_HOT
     void send_batch(BotFleet& fleet) noexcept {
         // Gather IDLE bots into sendmmsg batch
@@ -258,9 +245,7 @@ private:
         }
     }
 
-    // =========================================================================
     // Batched receive via epoll + vectorized recv
-    // =========================================================================
     IICPC_HOT
     std::size_t recv_batch(BotFleet& fleet, TelemetryRing& ring) noexcept {
         // Non-blocking poll
@@ -310,9 +295,7 @@ private:
         return recvs;
     }
 
-    // =========================================================================
     // Socket helpers
-    // =========================================================================
     static int connect_tcp(const char* host, uint16_t port) noexcept {
         int fd = ::socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0);
         if (fd < 0) return -1;
@@ -388,9 +371,7 @@ private:
         if (flags >= 0) ::fcntl(fd, F_SETFL, flags | O_NONBLOCK);
     }
 
-    // =========================================================================
     // Data members
-    // =========================================================================
     UltraEngineConfig config_{};
     int epoll_fd_ = -1;
 
@@ -406,12 +387,9 @@ private:
     std::size_t send_bot_indices_[UltraEngineConfig::SENDMMSG_BATCH] = {};
 };
 
-// =============================================================================
 // Ultra-Low-Latency Dummy Exchange (Unix Domain Socket)
-// =============================================================================
 // Separate from the TCP exchange, this runs on Unix domain sockets
 // for absolute minimum latency benchmarking.
-// =============================================================================
 
 class UltraExchange {
 public:

@@ -1,7 +1,5 @@
 #pragma once
-// =============================================================================
 // orderbook.hpp — SoA Price-Time Priority Limit Order Book
-// =============================================================================
 // Single-instrument LOB. Strict Data-Oriented Design:
 //   - Price levels stored as contiguous SoA arrays (not std::map)
 //   - Orders stored in a flat pool with intrusive linked list per level
@@ -10,7 +8,6 @@
 //
 // Price representation: int64_t scaled by PRICE_MULTIPLIER (10000).
 //   e.g., $100.50 = 1005000
-// =============================================================================
 
 #include "sdk/protocol.hpp"
 #include "core/arena.hpp"
@@ -25,9 +22,7 @@
 
 namespace iicpc {
 
-// =============================================================================
 // Constants
-// =============================================================================
 inline constexpr uint32_t MAX_ORDERS        = 65536;  // Per side
 inline constexpr uint32_t MAX_PRICE_LEVELS_OB = 4096; // Distinct price levels per side
 inline constexpr uint32_t NULL_INDEX        = UINT32_MAX;
@@ -38,9 +33,7 @@ inline constexpr uint32_t PRICE_MAP_MASK     = PRICE_MAP_CAPACITY - 1;
 static_assert((PRICE_MAP_CAPACITY & (PRICE_MAP_CAPACITY - 1)) == 0, "Must be power of 2");
 static_assert(PRICE_MAP_CAPACITY >= MAX_PRICE_LEVELS_OB * 2, "Load factor must be < 0.5");
 
-// =============================================================================
 // Order (stored in flat pool)
-// =============================================================================
 struct alignas(64) Order {
     uint64_t exchange_id;       // Global unique exchange order ID
     uint32_t client_order_id;   // Contestant-assigned
@@ -57,13 +50,10 @@ struct alignas(64) Order {
 };
 static_assert(sizeof(Order) == 64, "Order must be 1 cache line");
 
-// =============================================================================
 // Robin Hood Open-Addressed Hash Map: price → level index
-// =============================================================================
 // Fibonacci hashing gives excellent distribution for sequential integer keys.
 // Robin Hood probing bounds worst-case probe length and keeps variance low.
 // All memory from HugePageArena — zero heap allocation.
-// =============================================================================
 struct PriceHashMap {
     int64_t*  keys      = nullptr;  // Price keys (0 = empty sentinel)
     uint32_t* values    = nullptr;  // Level indices
@@ -189,9 +179,7 @@ struct PriceHashMap {
     }
 };
 
-// =============================================================================
 // Price Level Pool (SoA arrays) with O(1) hash-based lookup
-// =============================================================================
 struct PriceLevelPool {
     // SoA arrays — each field is a contiguous array
     int64_t*  prices       = nullptr; // Price at this level
@@ -329,9 +317,7 @@ private:
     }
 };
 
-// =============================================================================
 // Order Pool (flat array, free-list allocation)
-// =============================================================================
 struct OrderPool {
     Order*    orders    = nullptr;
     uint32_t* free_list = nullptr;  // Stack of free indices
@@ -363,9 +349,7 @@ struct OrderPool {
     }
 };
 
-// =============================================================================
 // Limit Order Book (single instrument)
-// =============================================================================
 class OrderBook {
 public:
     OrderBook() noexcept = default;
@@ -377,9 +361,7 @@ public:
         return true;
     }
 
-    // =========================================================================
     // Add order — returns order pool index (or NULL_INDEX on failure)
-    // =========================================================================
     IICPC_HOT
     uint32_t add_order(uint32_t contestant_id,
                        uint32_t client_order_id,
@@ -431,9 +413,7 @@ public:
         return oidx;
     }
 
-    // =========================================================================
     // Cancel order — returns true if found and cancelled
-    // =========================================================================
     bool cancel_order(uint32_t order_idx) noexcept {
         if (order_idx >= pool_.capacity) return false;
 
@@ -462,9 +442,7 @@ public:
         return true;
     }
 
-    // =========================================================================
     // Fill callback — called for each match
-    // =========================================================================
     struct MatchResult {
         uint32_t maker_idx;     // Resting order pool index
         uint32_t taker_contestant_id;
@@ -472,10 +450,8 @@ public:
         int32_t  fill_qty;
     };
 
-    // =========================================================================
     // Match incoming order against resting book
     // Returns number of fills. Fills are written to `out_fills`.
-    // =========================================================================
     IICPC_HOT IICPC_FLATTEN
     uint32_t match(Side aggressor_side,
                    int64_t price,
@@ -565,9 +541,7 @@ public:
         return fill_count;
     }
 
-    // =========================================================================
     // Accessors
-    // =========================================================================
     [[nodiscard]] int64_t best_bid_price() const noexcept {
         uint32_t b = bids_.find_best_bid();
         return (b != NULL_INDEX) ? bids_.prices[b] : 0;

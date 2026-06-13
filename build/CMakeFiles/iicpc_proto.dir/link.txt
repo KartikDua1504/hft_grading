@@ -1,2 +1,0 @@
-/usr/bin/ar qc libiicpc_proto.a CMakeFiles/iicpc_proto.dir/proto_gen/control.pb.cc.o CMakeFiles/iicpc_proto.dir/proto_gen/control.grpc.pb.cc.o
-/usr/bin/ranlib libiicpc_proto.a

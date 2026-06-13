@@ -1,18 +1,10 @@
 #pragma once
-// =============================================================================
-// hot_path_asm.hpp — Inline Assembly for Critical Hot Path Operations
-// =============================================================================
-// Hand-tuned x86-64 assembly for operations where compiler codegen matters.
-// Every nanosecond counts in the measurement loop.
-//
-// Why not just use intrinsics?
-//   - rdtsc: __rdtsc() adds unnecessary compiler barriers
-//   - memcpy: compiler generates rep movsb, we want explicit movdqa for 64B
-//   - pause: _mm_pause() is fine but we want tighter spin control
-//   - lfence: compiler may reorder around intrinsic calls
-//
+
+// --- Inline Assembly for Critical Hot Path Operations ---
+// Hand-tuned x86-64 assembly where compiler codegen matters.
+// Serialized RDTSC for measurement, SSE2 cache-line copies,
+// non-temporal stores, and prefetch chains.
 // All functions are FORCE_INLINE — zero call overhead.
-// =============================================================================
 
 #include <cstdint>
 #include <cstddef>
@@ -20,16 +12,8 @@
 namespace iicpc {
 namespace asm_hot {
 
-// =============================================================================
-// RDTSC — Read Time Stamp Counter (serialized)
-// =============================================================================
-// lfence; rdtsc — serialized read. lfence prevents out-of-order execution
-// from moving rdtsc ahead of prior instructions. This is the gold standard
-// for latency measurement on Intel/AMD.
-//
-// Cost: ~25 cycles (lfence) + ~20 cycles (rdtsc) = ~45 cycles total
-// Compare: __rdtsc() alone is ~20 cycles but NOT serialized
-// =============================================================================
+// --- RDTSC — Serialized Read ---
+// lfence + rdtsc: ~45 cycles total. Prevents out-of-order measurement artifacts.
 [[nodiscard]] __attribute__((always_inline))
 inline uint64_t rdtsc_serialized() noexcept {
     uint32_t lo, hi;
@@ -43,13 +27,9 @@ inline uint64_t rdtsc_serialized() noexcept {
     return (static_cast<uint64_t>(hi) << 32) | lo;
 }
 
-// =============================================================================
-// RDTSCP — Read TSC + Processor ID (already serialized on read side)
-// =============================================================================
-// rdtscp waits for all prior instructions to complete before reading.
-// Also returns processor ID in ecx (useful for detecting core migration).
-// Followed by lfence to prevent subsequent instructions from moving ahead.
-// =============================================================================
+// --- RDTSCP — Read TSC + Processor ID ---
+// Already serialized on read side. Returns cpu_id in ecx.
+// Followed by lfence to prevent subsequent reordering.
 [[nodiscard]] __attribute__((always_inline))
 inline uint64_t rdtscp_end(uint32_t* cpu_id = nullptr) noexcept {
     uint32_t lo, hi, aux;
@@ -64,15 +44,8 @@ inline uint64_t rdtscp_end(uint32_t* cpu_id = nullptr) noexcept {
     return (static_cast<uint64_t>(hi) << 32) | lo;
 }
 
-// =============================================================================
-// Precision Latency Measurement Pair
-// =============================================================================
-// Usage:
-//   uint64_t start = asm_hot::timestamp_begin();
-//   ... work ...
-//   uint64_t end = asm_hot::timestamp_end();
-//   uint64_t cycles = end - start;
-// =============================================================================
+// --- Precision Latency Measurement Pair ---
+// Usage: start = timestamp_begin(); ... work ...; end = timestamp_end();
 [[nodiscard]] __attribute__((always_inline))
 inline uint64_t timestamp_begin() noexcept {
     uint32_t lo, hi;
@@ -91,13 +64,8 @@ inline uint64_t timestamp_end() noexcept {
     return rdtscp_end();
 }
 
-// =============================================================================
-// Cache-Line Copy (64 bytes) — Single movdqa pair
-// =============================================================================
-// For copying cache-line-sized protocol messages (OrderEntry, Fill, etc.)
-// Uses SSE2 aligned loads/stores. 4x movdqa = 64 bytes in 4 cycles.
-// Compiler's memcpy may use rep movsb which has startup overhead.
-// =============================================================================
+// --- Cache-Line Copy (64 bytes) ---
+// SSE2 aligned loads/stores: 4x movdqa = 64 bytes in 4 cycles.
 __attribute__((always_inline))
 inline void copy_cacheline(void* __restrict__ dst,
                            const void* __restrict__ src) noexcept {
@@ -116,9 +84,8 @@ inline void copy_cacheline(void* __restrict__ dst,
     );
 }
 
-// =============================================================================
-// Half Cache-Line Copy (32 bytes) — For OrderAck, CancelAck, Heartbeat
-// =============================================================================
+// --- Half Cache-Line Copy (32 bytes) ---
+// For OrderAck, CancelAck, Heartbeat messages.
 __attribute__((always_inline))
 inline void copy_half_cacheline(void* __restrict__ dst,
                                 const void* __restrict__ src) noexcept {
@@ -133,13 +100,9 @@ inline void copy_half_cacheline(void* __restrict__ dst,
     );
 }
 
-// =============================================================================
-// Spin-Wait with Exponential Backoff (assembly PAUSE loop)
-// =============================================================================
-// PAUSE instruction: ~140 cycles on Alder Lake (was ~10 on older CPUs).
+// --- Spin-Wait with Exponential Backoff ---
+// PAUSE instruction: ~140 cycles on Alder Lake.
 // Reduces power consumption and memory bus contention during spin-waits.
-// Exponential backoff prevents livelock under high contention.
-// =============================================================================
 __attribute__((always_inline))
 inline void spin_pause_n(uint32_t count) noexcept {
     asm volatile(
@@ -153,12 +116,9 @@ inline void spin_pause_n(uint32_t count) noexcept {
     );
 }
 
-// =============================================================================
-// Non-Temporal Store (bypass cache, write-combine buffer)
-// =============================================================================
+// --- Non-Temporal Store (bypass cache) ---
 // For telemetry writes that won't be re-read soon. Avoids polluting L1/L2.
-// Uses movntdq (non-temporal store) + sfence after batch.
-// =============================================================================
+// Uses movntdq (non-temporal store) — call nt_store_fence() after batch.
 __attribute__((always_inline))
 inline void store_cacheline_nt(void* dst, const void* src) noexcept {
     asm volatile(
@@ -176,15 +136,13 @@ inline void store_cacheline_nt(void* dst, const void* src) noexcept {
     );
 }
 
-/// Must call after a batch of non-temporal stores
+/// Fence after a batch of non-temporal stores
 __attribute__((always_inline))
 inline void nt_store_fence() noexcept {
     asm volatile("sfence" ::: "memory");
 }
 
-// =============================================================================
-// Prefetch Chain (for SoA array traversal)
-// =============================================================================
+// --- Prefetch Chain (for SoA array traversal) ---
 __attribute__((always_inline))
 inline void prefetch_l1_read(const void* addr) noexcept {
     asm volatile("prefetcht0 (%[addr])" : : [addr] "r"(addr));

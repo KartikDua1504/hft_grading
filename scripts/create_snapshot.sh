@@ -1,13 +1,10 @@
 #!/bin/bash
-# =============================================================================
 # create_snapshot.sh — Pre-warm and Snapshot Firecracker MicroVM
-# =============================================================================
 # Strategy 1 from ARCHITECTURE_BOOK.md:
 #   Boot a base microVM → load glibc → pause → snapshot.
 #   Every contestant resumes from this snapshot (<5ms boot).
 #
 # Usage: sudo ./create_snapshot.sh
-# =============================================================================
 
 set -euo pipefail
 

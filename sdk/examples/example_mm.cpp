@@ -1,16 +1,8 @@
-// =============================================================================
-// example_mm.cpp — Example Orderbook Engine (Price-Time Priority)
-// =============================================================================
-// A simple but correct limit orderbook implementation.
+// --- Example Orderbook Engine (Price-Time Priority) ---
+// Reference limit orderbook implementation.
 // Maintains bid/ask sides as sorted arrays. Matches aggressive orders
 // against resting liquidity. Handles cancels.
-//
-// This is the REFERENCE implementation — the shadow orderbook on the
-// platform uses the same matching logic, so this should score ~1.0
-// correctness if the algorithms match.
-//
-// Build: g++ -std=c++23 -O2 -o engine example_mm.cpp strategy_main.cpp
-// =============================================================================
+// Serves as the reference implementation for shadow orderbook validation.
 
 #include "sdk/strategy_sdk.hpp"
 #include "sdk/protocol.hpp"
@@ -23,9 +15,7 @@ namespace {
 
 using namespace iicpc;
 
-// =============================================================================
 // Simple price-time priority orderbook
-// =============================================================================
 struct RestingOrder {
     uint32_t order_id;
     int64_t  price;
@@ -92,9 +82,7 @@ public:
     }
 
 private:
-    // =========================================================================
     // Limit order: try to match, then rest
-    // =========================================================================
     void process_limit_order(const OrderEntry& order,
                              IResponseSender& sender) noexcept {
         int32_t remaining = order.quantity;
@@ -164,9 +152,7 @@ private:
         sender.send(ack);
     }
 
-    // =========================================================================
     // Market order: match immediately, no resting
-    // =========================================================================
     void process_market_order(const OrderEntry& order,
                               IResponseSender& sender) noexcept {
         int32_t remaining = order.quantity;
@@ -221,9 +207,7 @@ private:
         sender.send(ack);
     }
 
-    // =========================================================================
     // Book management
-    // =========================================================================
     void insert_resting(uint32_t id, int64_t price,
                         int32_t qty, Side side) noexcept {
         if (side == Side::BUY) {
@@ -290,9 +274,7 @@ private:
 
 } // anonymous namespace
 
-// =============================================================================
 // Factory
-// =============================================================================
 iicpc::IStrategy* iicpc::create_strategy() {
     static SimpleOrderbook instance;
     return &instance;

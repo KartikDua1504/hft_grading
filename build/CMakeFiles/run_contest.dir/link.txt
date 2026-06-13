@@ -1,1 +1,0 @@
-/usr/bin/c++ -O3 -DNDEBUG -Wl,--dependency-file=CMakeFiles/run_contest.dir/link.d CMakeFiles/run_contest.dir/orchestrator/src/run_contest.cpp.o -o run_contest  libiicpc_core.a -lpthread

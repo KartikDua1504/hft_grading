@@ -1,14 +1,11 @@
-// =============================================================================
 // bench_ultra.cpp — Ultra-Low-Latency Benchmark
-// =============================================================================
 // Single-binary benchmark: exchange, loadgen, and telemetry all in one process
 // with separate pinned threads. Uses Unix domain sockets to bypass the TCP/IP
 // stack (no checksumming, no Nagle, no congestion control). Note: UDS still
 // transits the kernel's VFS layer — true kernel bypass requires SHM or DPDK.
 //
-// This is the "squeeze everything" benchmark.
+// Maximum throughput benchmark with all optimizations enabled.
 // Target: <5µs p50, >1M TPS
-// =============================================================================
 
 #include "core/arena.hpp"
 #include "core/ring_buffer.hpp"
@@ -37,9 +34,7 @@ using namespace iicpc;
 static volatile sig_atomic_t g_running = 1;
 static void signal_handler(int) { g_running = 0; }
 
-// =============================================================================
-// Configuration — everything is compile-time where possible
-// =============================================================================
+// Configuration — compile-time constants where possible
 static constexpr const char* UNIX_SOCKET_PATH = "/tmp/iicpc_ultra.sock";
 static constexpr uint16_t TCP_PORT = 9990;
 
@@ -92,29 +87,21 @@ int main(int argc, char* argv[]) {
     ::signal(SIGPIPE, SIG_IGN);
 
     std::fprintf(stderr, "\n");
-    std::fprintf(stderr, "╔══════════════════════════════════════════════════╗\n");
-    std::fprintf(stderr, "║   ULTRA-LOW-LATENCY BENCHMARK                   ║\n");
-    std::fprintf(stderr, "║   Target: <5µs p50, >1M TPS                     ║\n");
-    std::fprintf(stderr, "╚══════════════════════════════════════════════════╝\n\n");
+    std::fprintf(stderr, "--- ULTRA-LOW-LATENCY BENCHMARK ---\n");
+    std::fprintf(stderr, "--- Target: <5µs p50, >1M TPS ---\n");
 
-    // =========================================================================
     // Step 1: Arena + TSC calibration
-    // =========================================================================
     HugePageArena arena;
     (void)arena.init(1024ULL * 1024 * 1024); // 1 GiB
 
     auto tsc_cal = calibrate_tsc();
 
-    // =========================================================================
     // Step 2: Ring buffer
-    // =========================================================================
     using TelemetryRing = SPSCRingBuffer<LatencySample, 1048576>;
     void* ring_mem = arena.allocate_raw(TelemetryRing::TOTAL_SIZE, CACHE_LINE_SIZE);
     TelemetryRing ring(ring_mem, true);
 
-    // =========================================================================
     // Step 3: Start exchange thread
-    // =========================================================================
     UltraExchange exchange;
     // Pad cross-thread atomics to separate cache lines to prevent false sharing.
     // Without padding, spinning on exchange_stop while another thread writes
@@ -155,17 +142,13 @@ int main(int argc, char* argv[]) {
     // Small delay for listener socket to be fully up
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
-    // =========================================================================
     // Step 4: Bot fleet + payloads
-    // =========================================================================
     std::fprintf(stderr, "[bench] Initializing %zu bots...\n", cfg.num_bots);
     BotFleet fleet;
     fleet.init(arena, cfg.num_bots);
     generate_payloads(arena, fleet);
 
-    // =========================================================================
     // Step 5: Ultra engine
-    // =========================================================================
     UltraEngine engine;
     UltraEngineConfig engine_config{};
     engine_config.target_host = "127.0.0.1";
@@ -181,9 +164,7 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    // =========================================================================
     // Step 6: Telemetry consumer thread
-    // =========================================================================
     TelemetryConsumer consumer;
     ConsumerConfig consumer_config{};
     consumer_config.cpu_affinity = cfg.telemetry_cpu;
@@ -194,9 +175,7 @@ int main(int argc, char* argv[]) {
         consumer.run(ring);
     });
 
-    // =========================================================================
     // Step 7: RUN THE BENCHMARK
-    // =========================================================================
     std::fprintf(stderr, "\n[bench] === BENCHMARK START (%d seconds) ===\n\n",
                  cfg.duration_secs);
 
@@ -242,9 +221,7 @@ int main(int argc, char* argv[]) {
     if (exchange_thread.joinable()) exchange_thread.join();
     exchange.shutdown();
 
-    // =========================================================================
     // Step 9: Results
-    // =========================================================================
     const uint64_t total_sends = engine.total_sends();
     const uint64_t total_recvs = engine.total_recvs();
     const double tps = static_cast<double>(total_recvs) / elapsed_secs;
@@ -253,31 +230,26 @@ int main(int argc, char* argv[]) {
     auto pct = consumer.latest_percentiles();
 
     std::fprintf(stderr, "\n");
-    std::fprintf(stderr, "╔══════════════════════════════════════════════════════════════╗\n");
-    std::fprintf(stderr, "║               ULTRA BENCHMARK RESULTS                       ║\n");
-    std::fprintf(stderr, "╠══════════════════════════════════════════════════════════════╣\n");
-    std::fprintf(stderr, "║  Duration:     %.2f seconds                                ║\n", elapsed_secs);
-    std::fprintf(stderr, "║  Transport:    %-44s  ║\n",
+    std::fprintf(stderr, "--- ULTRA BENCHMARK RESULTS ---\n");
+    std::fprintf(stderr, "--- Duration:     %.2f seconds ---\n", elapsed_secs);
+    std::fprintf(stderr, "--- Transport:    %-44s ---\n",
                  cfg.use_unix ? "Unix Domain Socket (bypasses TCP/IP stack)" : "TCP/IP");
-    std::fprintf(stderr, "║  Bots:         %-44zu  ║\n", cfg.num_bots);
-    std::fprintf(stderr, "║                                                              ║\n");
-    std::fprintf(stderr, "║  Total Sends:  %-44lu  ║\n", total_sends);
-    std::fprintf(stderr, "║  Total Recvs:  %-44lu  ║\n", total_recvs);
-    std::fprintf(stderr, "║  Drops:        %-44lu  ║\n", drops);
-    std::fprintf(stderr, "║  TPS:          %-44.0f  ║\n", tps);
-    std::fprintf(stderr, "║                                                              ║\n");
-    std::fprintf(stderr, "║  Latency:                                                    ║\n");
-    std::fprintf(stderr, "║    p50:   %10.1f µs                                       ║\n",
+    std::fprintf(stderr, "--- Bots:         %-44zu ---\n", cfg.num_bots);
+    std::fprintf(stderr, "--- Total Sends:  %-44lu ---\n", total_sends);
+    std::fprintf(stderr, "--- Total Recvs:  %-44lu ---\n", total_recvs);
+    std::fprintf(stderr, "--- Drops:        %-44lu ---\n", drops);
+    std::fprintf(stderr, "--- TPS:          %-44.0f ---\n", tps);
+    std::fprintf(stderr, "--- Latency: ---\n");
+    std::fprintf(stderr, "--- p50:   %10.1f µs ---\n",
                  static_cast<double>(pct.p50) / 1000.0);
-    std::fprintf(stderr, "║    p90:   %10.1f µs                                       ║\n",
+    std::fprintf(stderr, "--- p90:   %10.1f µs ---\n",
                  static_cast<double>(pct.p90) / 1000.0);
-    std::fprintf(stderr, "║    p99:   %10.1f µs                                       ║\n",
+    std::fprintf(stderr, "--- p99:   %10.1f µs ---\n",
                  static_cast<double>(pct.p99) / 1000.0);
-    std::fprintf(stderr, "║    p999:  %10.1f µs                                       ║\n",
+    std::fprintf(stderr, "--- p999:  %10.1f µs ---\n",
                  static_cast<double>(pct.p999) / 1000.0);
-    std::fprintf(stderr, "║    max:   %10.1f µs                                       ║\n",
+    std::fprintf(stderr, "--- max:   %10.1f µs ---\n",
                  static_cast<double>(pct.max) / 1000.0);
-    std::fprintf(stderr, "║                                                              ║\n");
 
     // Verdicts
     const bool tps_ok = tps >= 100'000.0;
@@ -287,19 +259,18 @@ int main(int argc, char* argv[]) {
     const bool p50_50us = pct.p50 <= 50000;  // 50µs
     const bool p99_det = pct.p99 <= 100000;  // 100µs deterministic
 
-    std::fprintf(stderr, "║  [%s] TPS ≥ 100k                                          ║\n",
+    std::fprintf(stderr, "--- [%s] TPS ≥ 100k ---\n",
                  tps_ok ? "✓" : "✗");
-    std::fprintf(stderr, "║  [%s] TPS ≥ 1M                                             ║\n",
+    std::fprintf(stderr, "--- [%s] TPS ≥ 1M ---\n",
                  tps_1m ? "✓" : "✗");
-    std::fprintf(stderr, "║  [%s] Zero drops                                           ║\n",
+    std::fprintf(stderr, "--- [%s] Zero drops ---\n",
                  drops_ok ? "✓" : "✗");
-    std::fprintf(stderr, "║  [%s] p50 < 5µs (HFT-tier)                                ║\n",
+    std::fprintf(stderr, "--- [%s] p50 < 5µs (HFT-tier) ---\n",
                  p50_5us ? "✓" : "✗");
-    std::fprintf(stderr, "║  [%s] p50 < 50µs (exchange-tier)                           ║\n",
+    std::fprintf(stderr, "--- [%s] p50 < 50µs (exchange-tier) ---\n",
                  p50_50us ? "✓" : "✗");
-    std::fprintf(stderr, "║  [%s] p99 < 100µs (deterministic)                          ║\n",
+    std::fprintf(stderr, "--- [%s] p99 < 100µs (deterministic) ---\n",
                  p99_det ? "✓" : "✗");
-    std::fprintf(stderr, "╚══════════════════════════════════════════════════════════════╝\n");
 
     return 0;
 }

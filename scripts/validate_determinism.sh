@@ -1,12 +1,9 @@
 #!/bin/bash
-# =============================================================================
 # validate_determinism.sh — Snapshot Restore A/B Determinism Test
-# =============================================================================
 # Runs the same contestant binary N times from the same snapshot and compares
 # scores/throughput/latency to prove the VM state is clean and repeatable.
 #
 # Usage: ./scripts/validate_determinism.sh <source.cpp> [--runs 5]
-# =============================================================================
 
 set -euo pipefail
 

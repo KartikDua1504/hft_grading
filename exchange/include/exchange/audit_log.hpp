@@ -1,16 +1,9 @@
 #pragma once
-// =============================================================================
-// audit_log.hpp — Append-Only Binary Audit Log
-// =============================================================================
-// Every sequenced event (order, cancel, fill, ack) is written to an mmap'd
-// file. This enables:
-//   1. Deterministic replay: feed the same log → same fills, always
-//   2. Post-hoc correctness validation: run shadow book against log offline
-//   3. Forensics: investigate bugs, disputes, edge cases
-//
-// Format: fixed-size AuditEntry records, zero-copy via mmap.
-// No serialization overhead — entries are trivially copyable PODs.
-// =============================================================================
+
+// --- Append-Only Binary Audit Log ---
+// Every sequenced event is written to an mmap'd file.
+// Enables deterministic replay, post-hoc validation, and forensics.
+// Fixed-size AuditEntry records, zero-copy via mmap.
 
 #include "exchange/sequencer.hpp"
 #include "sdk/protocol.hpp"
@@ -25,33 +18,29 @@
 
 namespace iicpc {
 
-// =============================================================================
-// Audit entry types
-// =============================================================================
+// --- Audit Entry Types ---
 enum class AuditEntryType : uint8_t {
-    ORDER       = 1,   // New order submitted
-    CANCEL      = 2,   // Cancel request
-    FILL        = 3,   // Fill generated
-    ACK         = 4,   // Order ack (accept/reject)
-    CANCEL_ACK  = 5,   // Cancel ack
-    MARKET_DATA = 6,   // Market data tick
-    SESSION     = 7,   // Session start/end
+    ORDER       = 1,
+    CANCEL      = 2,
+    FILL        = 3,
+    ACK         = 4,
+    CANCEL_ACK  = 5,
+    MARKET_DATA = 6,
+    SESSION     = 7,
 };
 
-// =============================================================================
-// Audit entry — fixed 128 bytes for alignment
-// =============================================================================
+// --- Audit Entry (128 bytes, cache-line aligned) ---
 struct alignas(64) AuditEntry {
     // Header (16 bytes)
     AuditEntryType type;
     uint8_t        _pad0[3];
     uint32_t       contestant_id;
-    uint64_t       sequence_no;     // Sequencer-assigned number
+    uint64_t       sequence_no;
 
     // Timestamp (8 bytes)
     uint64_t       tsc;             // rdtsc at log time
 
-    // Payload (104 bytes — fits any message type)
+    // Payload — fits any message type
     union {
         OrderEntry    order;        // 64 bytes
         CancelRequest cancel;       // 32 bytes
@@ -59,15 +48,12 @@ struct alignas(64) AuditEntry {
         OrderAck      ack;          // 32 bytes
         CancelAck     cancel_ack;   // 32 bytes
         MarketUpdate  market_data;  // 64 bytes
-        uint8_t       raw[96];      // Generic raw payload
+        uint8_t       raw[96];
     };
 };
-// Note: sizeof may be > 128 due to union alignment; that's acceptable
 static_assert(std::is_trivially_copyable_v<AuditEntry>);
 
-// =============================================================================
-// Audit Log — mmap'd append-only file
-// =============================================================================
+// --- Audit Log (mmap'd append-only file) ---
 inline constexpr uint64_t AUDIT_LOG_MAX_ENTRIES = 1 << 20; // 1M entries
 inline constexpr uint64_t AUDIT_LOG_MAX_SIZE =
     AUDIT_LOG_MAX_ENTRIES * sizeof(AuditEntry);
@@ -77,13 +63,10 @@ public:
     AuditLog() noexcept = default;
     ~AuditLog() noexcept { close(); }
 
-    // No copy
     AuditLog(const AuditLog&) = delete;
     AuditLog& operator=(const AuditLog&) = delete;
 
-    // =========================================================================
-    // Open for writing (creates/truncates file, mmaps it)
-    // =========================================================================
+    // --- Open for writing (creates/truncates, mmaps) ---
     bool open_write(const char* path) noexcept {
         fd_ = ::open(path, O_RDWR | O_CREAT | O_TRUNC, 0644);
         if (fd_ < 0) {
@@ -92,7 +75,6 @@ public:
             return false;
         }
 
-        // Pre-allocate the file
         if (::ftruncate(fd_, static_cast<off_t>(AUDIT_LOG_MAX_SIZE)) < 0) {
             std::fprintf(stderr, "[audit] ftruncate failed: %s\n",
                          strerror(errno));
@@ -113,7 +95,6 @@ public:
             return false;
         }
 
-        // Advise sequential access
         ::madvise(base_, AUDIT_LOG_MAX_SIZE, MADV_SEQUENTIAL);
 
         write_pos_ = 0;
@@ -123,9 +104,7 @@ public:
         return true;
     }
 
-    // =========================================================================
-    // Open for reading (readonly mmap)
-    // =========================================================================
+    // --- Open for reading (readonly mmap) ---
     bool open_read(const char* path) noexcept {
         fd_ = ::open(path, O_RDONLY);
         if (fd_ < 0) return false;
@@ -154,9 +133,7 @@ public:
         return true;
     }
 
-    // =========================================================================
-    // Log an order
-    // =========================================================================
+    // --- Log an order ---
     void log_order(uint64_t seq_no, uint32_t contestant_id,
                    const OrderEntry& order, uint64_t tsc) noexcept {
         if (!can_write()) return;
@@ -201,13 +178,11 @@ public:
         std::memcpy(&e.ack, &ack, sizeof(OrderAck));
     }
 
-    // =========================================================================
-    // Read (for replay / validation)
-    // =========================================================================
+    // --- Read (for replay / validation) ---
     bool read_next(AuditEntry& out) noexcept {
         if (!readonly_ || read_pos_ >= max_entries_) return false;
         const AuditEntry& e = base_[read_pos_];
-        if (e.type == static_cast<AuditEntryType>(0)) return false; // End
+        if (e.type == static_cast<AuditEntryType>(0)) return false;
         std::memcpy(&out, &e, sizeof(AuditEntry));
         read_pos_++;
         return true;
@@ -215,9 +190,7 @@ public:
 
     void reset_read() noexcept { read_pos_ = 0; }
 
-    // =========================================================================
-    // Flush + close
-    // =========================================================================
+    // --- Flush + close ---
     void flush() noexcept {
         if (base_ && !readonly_) {
             ::msync(base_, write_pos_ * sizeof(AuditEntry), MS_SYNC);
@@ -232,7 +205,6 @@ public:
         }
         if (fd_ >= 0) {
             if (!readonly_ && write_pos_ > 0) {
-                // Truncate to actual size
                 ::ftruncate(fd_, static_cast<off_t>(
                     write_pos_ * sizeof(AuditEntry)));
             }

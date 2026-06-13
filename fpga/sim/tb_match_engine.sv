@@ -1,9 +1,6 @@
-// =============================================================================
 // tb_match_engine.sv — Matching Engine Testbench (II=1 Pipeline)
-// =============================================================================
 // Tests: insert, match, cancel, market sweep, throughput benchmark,
 //        pipelined II=1 throughput, sustained crossing benchmark
-// =============================================================================
 
 `timescale 1ns / 1ps
 
@@ -83,9 +80,7 @@ module tb_match_engine;
             total_acks++;
     end
 
-    // =========================================================================
     // Helper: submit order and wait for pipeline to fully drain
-    // =========================================================================
     task automatic submit_order(
         input logic [7:0]  msg_type,
         input logic [7:0]  side,
@@ -118,9 +113,7 @@ module tb_match_engine;
         @(posedge clk);
     endtask
 
-    // =========================================================================
     // Helper: fire-and-forget (for pipelined II=1 throughput test)
-    // =========================================================================
     task automatic submit_order_pipelined(
         input logic [7:0]  msg_type,
         input logic [7:0]  side,
@@ -155,9 +148,7 @@ module tb_match_engine;
     localparam logic [7:0] TYPE_MARKET = ORDER_MARKET;
     localparam logic [7:0] TYPE_IOC    = ORDER_IOC;
 
-    // =========================================================================
     // Test sequence
-    // =========================================================================
     initial begin
         $dumpfile("dump.vcd");
         $dumpvars(0, tb_match_engine);
@@ -175,9 +166,7 @@ module tb_match_engine;
         rst_n = 1;
         repeat(10) @(posedge clk);
 
-        // =====================================================================
         // Test 1: Insert limit order (no match) → ack ACCEPTED
-        // =====================================================================
         $display("\n[TEST 1] Insert limit BUY @ 100, qty=10");
         submit_order(ORDER_ENTRY, SIDE_BUY, TYPE_LIMIT, 1001, 64'd1000000, 32'd10, 8'd1);
         $display("  Best bid: %0d  Resting: %0d  Acks: %0d",
@@ -189,9 +178,7 @@ module tb_match_engine;
             errors++;
         end
 
-        // =====================================================================
         // Test 2: Insert matching SELL → fill
-        // =====================================================================
         $display("\n[TEST 2] Insert limit SELL @ 100, qty=5 (should match BUY)");
         begin
             logic [31:0] hw_fills_before;
@@ -210,9 +197,7 @@ module tb_match_engine;
             end
         end
 
-        // =====================================================================
         // Test 3: Build order book depth
-        // =====================================================================
         $display("\n[TEST 3] Build book: 5 buy levels, 5 sell levels");
         for (int i = 0; i < 5; i++) begin
             submit_order(ORDER_ENTRY, SIDE_BUY, TYPE_LIMIT,
@@ -229,9 +214,7 @@ module tb_match_engine;
             errors++;
         end
 
-        // =====================================================================
         // Test 4: Cancel order
-        // =====================================================================
         $display("\n[TEST 4] Cancel order 3000");
         begin
             int resting_before = stat_resting_orders;
@@ -246,9 +229,7 @@ module tb_match_engine;
             end
         end
 
-        // =====================================================================
         // Test 5: Aggressive crossing order
-        // =====================================================================
         $display("\n[TEST 5] Aggressive BUY @ 101 (cross ask)");
         begin
             logic [31:0] hw_fills_before;
@@ -265,9 +246,7 @@ module tb_match_engine;
             end
         end
 
-        // =====================================================================
         // Test 6: Sequential throughput — 1000 alternating buy/sell (blocking)
-        // =====================================================================
         $display("\n[TEST 6] Sequential throughput: 1000 orders (blocking submit)");
         begin
             longint start_time;
@@ -307,9 +286,7 @@ module tb_match_engine;
             end
         end
 
-        // =====================================================================
         // Test 7: Pipelined throughput — 1000 non-crossing orders (II=1 target)
-        // =====================================================================
         $display("\n[TEST 7] Pipelined throughput: 1000 non-crossing orders (II=1 target)");
         begin
             longint start_time;
@@ -374,9 +351,7 @@ module tb_match_engine;
             end
         end
 
-        // =====================================================================
         // Test 8: Sustained crossing — 1000 alternating BUY/SELL @ same price
-        // =====================================================================
         $display("\n[TEST 8] Sustained crossing: 1000 orders (alternating BUY/SELL)");
         begin
             longint start_time;
@@ -419,9 +394,7 @@ module tb_match_engine;
             end
         end
 
-        // =====================================================================
         // Summary
-        // =====================================================================
         $display("\n========================================");
         $display("     MATCHING ENGINE RESULTS (II=1)");
         $display("========================================");

@@ -5,9 +5,7 @@ project(iicpc_benchmark
     DESCRIPTION "IICPC HFT-Grade Distributed Benchmarking Platform"
 )
 
-# ==============================================================================
 # Global Settings
-# ==============================================================================
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)          # No GNU extensions — pure ISO C++23
@@ -22,17 +20,13 @@ endif()
 # Include our compiler flags
 include(cmake/CompilerFlags.cmake)
 
-# ==============================================================================
 # Options
-# ==============================================================================
 option(IICPC_USE_URING    "Use io_uring for async I/O (requires liburing)" ON)
 option(IICPC_USE_HUGEPAGES "Use 2MB huge pages for arena allocator"       ON)
 option(IICPC_BUILD_BENCH  "Build benchmark/validation targets"            ON)
 option(IICPC_SANITIZE     "Build with ASan+UBSan (debug only)"            OFF)
 
-# ==============================================================================
 # Third-party: liburing (build from source if not found)
-# ==============================================================================
 if(IICPC_USE_URING)
     find_library(LIBURING_LIB NAMES uring)
     find_path(LIBURING_INCLUDE NAMES liburing.h)
@@ -79,9 +73,7 @@ else()
     add_compile_definitions(IICPC_HAS_URING=0)
 endif()
 
-# ==============================================================================
 # Core Library (arena, ring buffer, flat map, HDR histogram, TSC)
-# ==============================================================================
 add_library(iicpc_core STATIC
     core/src/arena.cpp
     core/src/hdr_histogram.cpp
@@ -90,9 +82,7 @@ target_include_directories(iicpc_core PUBLIC core/include)
 iicpc_target_hotpath(iicpc_core)
 target_link_libraries(iicpc_core PUBLIC pthread)
 
-# ==============================================================================
 # Load Generator Library
-# ==============================================================================
 add_library(iicpc_loadgen STATIC
     loadgen/src/bot_fleet.cpp
     loadgen/src/payload_gen.cpp
@@ -105,9 +95,7 @@ if(IICPC_USE_URING)
 endif()
 iicpc_target_hotpath(iicpc_loadgen)
 
-# ==============================================================================
 # Telemetry Consumer
-# ==============================================================================
 add_library(iicpc_telemetry STATIC
     telemetry/src/consumer.cpp
 )
@@ -115,9 +103,7 @@ target_include_directories(iicpc_telemetry PUBLIC telemetry/include)
 target_link_libraries(iicpc_telemetry PUBLIC iicpc_core)
 iicpc_target_hotpath(iicpc_telemetry)
 
-# ==============================================================================
 # Dummy Exchange Server (Stage 1 validation target)
-# ==============================================================================
 add_executable(dummy_exchange server/src/dummy_exchange.cpp)
 target_link_libraries(dummy_exchange PRIVATE iicpc_core iicpc_loadgen)
 if(IICPC_USE_URING)
@@ -125,9 +111,12 @@ if(IICPC_USE_URING)
 endif()
 iicpc_target_hotpath(dummy_exchange)
 
-# ==============================================================================
+# Multi-threaded Exchange Server (for transport benchmarking)
+add_executable(mt_exchange server/src/mt_exchange.cpp)
+target_link_libraries(mt_exchange PRIVATE iicpc_core iicpc_loadgen pthread)
+iicpc_target_hotpath(mt_exchange)
+
 # Benchmark / Validation Targets
-# ==============================================================================
 if(IICPC_BUILD_BENCH)
     # Full Checkpoint 1 validation harness
     add_executable(validate_checkpoint1 bench/validate_checkpoint1.cpp)
@@ -170,11 +159,17 @@ if(IICPC_BUILD_BENCH)
     target_include_directories(bench_blaster PRIVATE sdk/include)
     target_link_libraries(bench_blaster PRIVATE iicpc_core iicpc_loadgen)
     iicpc_target_bench(bench_blaster)
+
+    # io_uring vs epoll transport benchmark
+    if(IICPC_USE_URING)
+        add_executable(bench_iouring bench/bench_iouring.cpp)
+        target_link_libraries(bench_iouring PRIVATE
+            iicpc_core iicpc_loadgen iicpc_telemetry liburing)
+        iicpc_target_bench(bench_iouring)
+    endif()
 endif()
 
-# ==============================================================================
 # Stage 2: gRPC Orchestrator + Sandbox
-# ==============================================================================
 option(IICPC_BUILD_STAGE2 "Build Stage 2 orchestrator and sandbox targets" ON)
 
 if(IICPC_BUILD_STAGE2)
@@ -265,9 +260,7 @@ else()
     message(STATUS "  Stage 2:       OFF")
 endif()
 
-# ==============================================================================
 # Stage 3: Exchange + SDK (Competition Platform)
-# ==============================================================================
 message(STATUS "")
 message(STATUS "--- Stage 3: Exchange + SDK ---")
 
@@ -318,9 +311,7 @@ target_include_directories(sample_orderbook PRIVATE sdk/include)
 
 message(STATUS "  Contest Runner: ON (compile → blast → validate → score)")
 
-# ==============================================================================
 # Summary
-# ==============================================================================
 message(STATUS "")
 message(STATUS "=== IICPC Benchmark Platform ===")
 message(STATUS "  C++ Standard:  ${CMAKE_CXX_STANDARD}")

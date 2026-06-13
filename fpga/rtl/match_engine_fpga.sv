@@ -1,6 +1,4 @@
-// =============================================================================
 // match_engine_fpga.sv — FPGA Matching Engine (True II=1 Pipeline)
-// =============================================================================
 // Hardware-accelerated price-time priority limit order book.
 //
 // *** ARCHITECTURE: 2-Stage Pipeline with BBO Forwarding ***
@@ -33,7 +31,6 @@
 // cause incorrect crossing decisions on consecutive orders.
 //
 // Target: AMD Xilinx Virtex UltraScale+ (AWS F2)
-// =============================================================================
 
 `timescale 1ns / 1ps
 `default_nettype none
@@ -99,9 +96,7 @@ module match_engine_fpga
     output logic [31:0]                 stat_ask_levels
 );
 
-    // =========================================================================
     // Order pool (BRAM)
-    // =========================================================================
     localparam int ORDER_ENTRY_W = 192;
 
     (* ram_style = "block" *)
@@ -111,9 +106,7 @@ module match_engine_fpga
     logic [ORDER_ADDR_W-1:0] free_stack [0:MAX_ORDERS-1];
     logic [ORDER_ADDR_W-1:0] free_top;
 
-    // =========================================================================
     // Register-mapped BBO — O(1) access, flip-flop storage
-    // =========================================================================
     logic [PRICE_WIDTH-1:0]    best_bid_price;
     logic [QTY_WIDTH-1:0]      best_bid_qty;
     logic [ORDER_ADDR_W-1:0]   best_bid_head;
@@ -124,10 +117,8 @@ module match_engine_fpga
     logic [ORDER_ADDR_W-1:0]   best_ask_head;
     logic                       ask_valid_flag;
 
-    // =========================================================================
     // Cancel lookup map — 2-way set-associative (prevents hash collisions)
     // Each set has 2 ways. Each way stores: {valid, order_id_tag, pool_index}
-    // =========================================================================
     localparam int CANCEL_MAP_SETS = 4096;
     localparam int CANCEL_MAP_W = $clog2(CANCEL_MAP_SETS);
 
@@ -147,9 +138,7 @@ module match_engine_fpga
     (* ram_style = "block" *)
     logic                      cancel_map_v1    [0:CANCEL_MAP_SETS-1];
 
-    // =========================================================================
     // Pipeline Stage 2 state
-    // =========================================================================
     typedef enum logic [1:0] {
         S2_IDLE,        // No work in S2 — pipeline empty
         S2_EXECUTE,     // Executing 1-cycle op (insert/cancel) — can accept next
@@ -159,9 +148,7 @@ module match_engine_fpga
 
     s2_state_t s2_state;
 
-    // =========================================================================
     // Stage 2 pipeline registers (latched from input)
-    // =========================================================================
     logic                      s2_valid;
     logic [7:0]                s2_msg_type;
     logic [CONTESTANT_W-1:0]   s2_contestant_id;
@@ -179,18 +166,14 @@ module match_engine_fpga
     logic [ORDER_ADDR_W-1:0]   s2_match_cursor;
     logic [4:0]                s2_sweep_depth;
 
-    // =========================================================================
     // Fibonacci hash for cancel map
-    // =========================================================================
     function automatic logic [CANCEL_MAP_W-1:0] cancel_hash(
         input logic [ORDER_ID_WIDTH-1:0] oid
     );
         return (oid * 32'h9E3779B9) >> (32 - CANCEL_MAP_W);
     endfunction
 
-    // =========================================================================
     // Combinational: BBO forwarding from S2 → S1
-    // =========================================================================
     // When S2 is executing an insert THIS cycle, the BBO update hasn't been
     // committed yet (non-blocking <=). We forward the *intended* update
     // combinationally so S1's crossing detection sees the correct BBO.
@@ -249,9 +232,7 @@ module match_engine_fpga
         s2_fill_exhausts_ask   ? 1'b0 :
         ask_valid_flag;
 
-    // =========================================================================
     // Combinational: S1 crossing detection (uses forwarded BBO)
-    // =========================================================================
     wire s1_can_match_bid = (in_side == SIDE_BUY)  && fwd_ask_valid &&
                             (in_price >= fwd_best_ask_price);
     wire s1_can_match_ask = (in_side == SIDE_SELL) && fwd_bid_valid &&
@@ -259,9 +240,7 @@ module match_engine_fpga
     wire s1_is_crossing = in_valid && (in_msg_type == MSG_ORDER_ENTRY) &&
                           (s1_can_match_bid || s1_can_match_ask);
 
-    // =========================================================================
     // Pipeline control: when can S1 accept a new order?
-    // =========================================================================
     // Accept when:
     //  - S2 is idle (pipeline empty), OR
     //  - S2 is executing a 1-cycle op (insert/cancel) and will complete this cycle
@@ -278,18 +257,14 @@ module match_engine_fpga
     // The actual accept signal
     wire accept = in_valid && in_ready;
 
-    // =========================================================================
     // Market data output — uses forwarded BBO for lowest latency
-    // =========================================================================
     assign md_valid     = 1'b1;
     assign md_best_bid     = fwd_bid_valid ? fwd_best_bid_price : '0;
     assign md_best_bid_qty = fwd_bid_valid ? fwd_best_bid_qty   : '0;
     assign md_best_ask     = fwd_ask_valid ? fwd_best_ask_price : {PRICE_WIDTH{1'b1}};
     assign md_best_ask_qty = fwd_ask_valid ? fwd_best_ask_qty   : '0;
 
-    // =========================================================================
     // Main pipeline logic
-    // =========================================================================
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
             s2_state          <= S2_IDLE;
@@ -326,9 +301,7 @@ module match_engine_fpga
 
             case (s2_state)
 
-                // =============================================================
                 // S2_IDLE: Pipeline empty — just latch input if available
-                // =============================================================
                 S2_IDLE: begin
                     if (accept) begin
                         // Latch input into S2 pipeline registers
@@ -358,9 +331,7 @@ module match_engine_fpga
                     end
                 end
 
-                // =============================================================
                 // S2_EXECUTE: 1-cycle insert/cancel — can accept next input
-                // =============================================================
                 S2_EXECUTE: begin
                     if (s2_msg_type == MSG_CANCEL_REQ) begin
                         // ── Cancel path: 2-way set-associative lookup ──
@@ -474,9 +445,7 @@ module match_engine_fpga
                     end
                 end
 
-                // =============================================================
                 // S2_CROSSING: Multi-cycle crossing — compute fill, go to emit
-                // =============================================================
                 S2_CROSSING: begin
                     if (s2_remaining_qty > 0 && s2_sweep_depth < MAX_SWEEP_DEPTH) begin
                         // Compute fill quantity
@@ -511,9 +480,7 @@ module match_engine_fpga
                     end
                 end
 
-                // =============================================================
                 // S2_FILL_OUT: Emit fill, update BBO, loop for more sweep
-                // =============================================================
                 S2_FILL_OUT: begin
                     // Drive fill outputs
                     fill_valid          <= 1'b1;

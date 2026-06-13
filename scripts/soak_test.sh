@@ -1,11 +1,8 @@
 #!/bin/bash
-# =============================================================================
 # soak_test.sh — Operational Soak / Crash / Backpressure Tests
-# =============================================================================
 # Tests the platform under sustained load, crash recovery, and queue saturation.
 #
 # Usage: ./scripts/soak_test.sh [--duration 300] [--concurrent 5]
-# =============================================================================
 
 set -euo pipefail
 
@@ -92,9 +89,7 @@ int main(int argc, char** argv) {
 }
 EOF
 
-# =============================================================================
 # Test 1: Health Check
-# =============================================================================
 log "Test 1: Health Check"
 HEALTH=$(curl -s -o /dev/null -w "%{http_code}" "$API_URL/api/health" 2>/dev/null || echo "000")
 if [[ "$HEALTH" == "200" ]]; then
@@ -105,9 +100,7 @@ else
     exit 1
 fi
 
-# =============================================================================
 # Test 2: System Status
-# =============================================================================
 log "Test 2: System Status"
 STATUS=$(curl -s "$API_URL/api/system/status" 2>/dev/null || echo "{}")
 echo "$STATUS" | python3 -m json.tool > "$RESULTS_DIR/system_status.json" 2>/dev/null || true
@@ -115,9 +108,7 @@ ISOLATION=$(echo "$STATUS" | python3 -c "import sys,json; print(json.load(sys.st
 READY=$(echo "$STATUS" | python3 -c "import sys,json; print(json.load(sys.stdin).get('ready',False))" 2>/dev/null || echo "False")
 log "  Isolation: $ISOLATION | Ready: $READY"
 
-# =============================================================================
 # Test 3: Registration + Auth
-# =============================================================================
 log "Test 3: Registration + Authentication"
 TEAM="soak_$(date +%s)"
 TOKEN=$(curl -s -X POST "$API_URL/api/auth/register" \
@@ -142,9 +133,7 @@ else
     fail "Duplicate registration not rejected (HTTP $DUP)"
 fi
 
-# =============================================================================
 # Test 4: Rate Limiting
-# =============================================================================
 log "Test 4: Rate Limiting"
 
 # First submission should succeed
@@ -163,9 +152,7 @@ else
     warn "Rate limiting may not be active (HTTP $SUB2)"
 fi
 
-# =============================================================================
 # Test 5: Invalid Input Rejection
-# =============================================================================
 log "Test 5: Input Validation"
 PASS=0
 TOTAL=0
@@ -203,9 +190,7 @@ else
     warn "Input validation: $PASS/$TOTAL passed"
 fi
 
-# =============================================================================
 # Test 6: Metrics Endpoint
-# =============================================================================
 log "Test 6: Metrics"
 METRICS=$(curl -s "$API_URL/api/metrics" 2>/dev/null || echo "{}")
 echo "$METRICS" | python3 -m json.tool > "$RESULTS_DIR/metrics.json" 2>/dev/null || true
@@ -216,9 +201,7 @@ else
     fail "Metrics endpoint not returning data"
 fi
 
-# =============================================================================
 # Test 7: WebSocket Connection
-# =============================================================================
 log "Test 7: WebSocket"
 if command -v websocat &>/dev/null; then
     WS_DATA=$(timeout 3 websocat "ws://localhost:8000/ws/live" 2>/dev/null | head -1 || echo "")
@@ -231,9 +214,7 @@ else
     warn "websocat not installed, skipping WebSocket test"
 fi
 
-# =============================================================================
 # Test 8: Leaderboard
-# =============================================================================
 log "Test 8: Leaderboard"
 LB=$(curl -s -o /dev/null -w "%{http_code}" "$API_URL/api/leaderboard" 2>/dev/null || echo "000")
 if [[ "$LB" == "200" ]]; then
@@ -242,9 +223,7 @@ else
     fail "Leaderboard failed (HTTP $LB)"
 fi
 
-# =============================================================================
 # Summary
-# =============================================================================
 echo ""
 echo -e "${CYAN}═══════════════════════════════════════════════════════════${NC}"
 echo -e "${CYAN}                  SOAK TEST COMPLETE                      ${NC}"

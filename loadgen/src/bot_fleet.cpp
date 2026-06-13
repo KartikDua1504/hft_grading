@@ -1,6 +1,4 @@
-// =============================================================================
 // bot_fleet.cpp — Bot Fleet initialization (thin, most logic is in header)
-// =============================================================================
 #include "loadgen/bot_fleet.hpp"
 
 // The BotFleet is fully defined in the header as it's a POD SoA struct.

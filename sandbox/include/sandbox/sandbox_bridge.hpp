@@ -1,8 +1,6 @@
 #pragma once
-// =============================================================================
 // sandbox_bridge.hpp — Host ↔ Firecracker VM IPC Bridge
-// =============================================================================
-// The critical boundary between our trusted load generator and the untrusted
+// IPC bridge between the trusted load generator and the untrusted
 // contestant code running inside a Firecracker microVM.
 //
 // Data flow:
@@ -19,7 +17,6 @@
 //   a DROP. Drops = penalty. We never block the host — non-blocking sends.
 //
 // Lock-free host side. Spin-based wait on response. Zero heap allocation.
-// =============================================================================
 
 #include "core/types.hpp"
 #include "core/hot_path_asm.hpp"
@@ -43,9 +40,7 @@ namespace iicpc {
 
 // ContestantResponse is defined in sdk/strategy_sdk.hpp
 
-// =============================================================================
 // Latency record (per-order timing)
-// =============================================================================
 struct OrderLatency {
     uint32_t order_id;
     uint64_t send_tsc;     // Host-side TSC at socket write
@@ -54,9 +49,7 @@ struct OrderLatency {
     bool     was_dropped;  // True if send() returned EAGAIN
 };
 
-// =============================================================================
 // Bridge statistics
-// =============================================================================
 struct BridgeStats {
     uint64_t orders_sent      = 0;
     uint64_t responses_recv   = 0;
@@ -68,9 +61,7 @@ struct BridgeStats {
     uint64_t max_latency_ns   = 0;
 };
 
-// =============================================================================
 // Sandbox Bridge
-// =============================================================================
 inline constexpr uint32_t RESPONSE_RING_SIZE = 65536;
 inline constexpr uint32_t LATENCY_RING_SIZE  = 65536;
 
@@ -103,9 +94,7 @@ public:
         return true;
     }
 
-    // =========================================================================
     // Create listening socket, wait for contestant VM to connect
-    // =========================================================================
     [[nodiscard]] bool listen_and_accept(int timeout_ms = 10000) noexcept {
         ::unlink(socket_path_);
 
@@ -151,14 +140,12 @@ public:
         return true;
     }
 
-    // =========================================================================
     // Send an order to contestant (non-blocking, measures latency)
-    // =========================================================================
     IICPC_HOT
     bool send_order(const BlastOrder& order) noexcept {
         if (client_fd_ < 0) return false;
 
-        // === TIMING BOUNDARY: clock starts HERE ===
+        // --- TIMING BOUNDARY: clock starts HERE ---
         uint64_t send_tsc = asm_hot::rdtsc_serialized();
 
         ssize_t n = ::send(client_fd_, order.data, order.size,
@@ -191,9 +178,7 @@ public:
         return true;
     }
 
-    // =========================================================================
     // Receive responses from contestant (non-blocking, drain loop)
-    // =========================================================================
     IICPC_HOT
     uint32_t recv_responses() noexcept {
         if (client_fd_ < 0) return 0;
@@ -205,7 +190,7 @@ public:
             ssize_t n = ::recv(client_fd_, buf, sizeof(buf), MSG_DONTWAIT);
             if (n <= 0) break;
 
-            // === TIMING BOUNDARY: clock stops HERE ===
+            // --- TIMING BOUNDARY: clock stops HERE ---
             uint64_t recv_tsc = asm_hot::rdtscp_end();
 
             // Parse response(s) — contestant may batch
@@ -247,9 +232,7 @@ public:
         return count;
     }
 
-    // =========================================================================
     // Pop a response for validation
-    // =========================================================================
     [[nodiscard]] bool pop_response(ContestantResponse& out) noexcept {
         if (resp_head_ >= resp_tail_) return false;
         asm_hot::copy_cacheline(&out, &responses_[resp_head_ % RESPONSE_RING_SIZE]);
@@ -257,9 +240,7 @@ public:
         return true;
     }
 
-    // =========================================================================
     // Pop a latency record
-    // =========================================================================
     [[nodiscard]] bool pop_latency(OrderLatency& out) noexcept {
         if (lat_head_ >= lat_tail_) return false;
         std::memcpy(&out, &latencies_[lat_head_ % LATENCY_RING_SIZE], sizeof(out));
@@ -267,9 +248,7 @@ public:
         return true;
     }
 
-    // =========================================================================
     // Send a control message (SessionStart/SessionEnd) — blocking
-    // =========================================================================
     bool send_control(const void* msg, size_t len) noexcept {
         if (client_fd_ < 0) return false;
         ssize_t n = ::send(client_fd_, msg, len, MSG_NOSIGNAL);
@@ -287,20 +266,17 @@ public:
 
     void print_stats() const noexcept {
         std::fprintf(stderr, "\n");
-        std::fprintf(stderr, "╔══════════════════════════════════════════════════════════╗\n");
-        std::fprintf(stderr, "║              SANDBOX BRIDGE STATISTICS                  ║\n");
-        std::fprintf(stderr, "╠══════════════════════════════════════════════════════════╣\n");
-        std::fprintf(stderr, "║  Orders Sent:     %-37lu ║\n", stats_.orders_sent);
-        std::fprintf(stderr, "║  Responses Recv:  %-37lu ║\n", stats_.responses_recv);
-        std::fprintf(stderr, "║  Drops (backpr.): %-37lu ║\n", stats_.drops);
-        std::fprintf(stderr, "║  Partial Sends:   %-37lu ║\n", stats_.partial_sends);
-        std::fprintf(stderr, "║  Recv Errors:     %-37lu ║\n", stats_.recv_errors);
+        std::fprintf(stderr, "--- SANDBOX BRIDGE STATISTICS ---\n");
+        std::fprintf(stderr, "--- Orders Sent:     %-37lu ---\n", stats_.orders_sent);
+        std::fprintf(stderr, "--- Responses Recv:  %-37lu ---\n", stats_.responses_recv);
+        std::fprintf(stderr, "--- Drops (backpr.): %-37lu ---\n", stats_.drops);
+        std::fprintf(stderr, "--- Partial Sends:   %-37lu ---\n", stats_.partial_sends);
+        std::fprintf(stderr, "--- Recv Errors:     %-37lu ---\n", stats_.recv_errors);
         double drop_rate = (stats_.orders_sent > 0)
             ? 100.0 * static_cast<double>(stats_.drops) /
               static_cast<double>(stats_.orders_sent + stats_.drops)
             : 0.0;
-        std::fprintf(stderr, "║  Drop Rate:       %-34.2f %% ║\n", drop_rate);
-        std::fprintf(stderr, "╚══════════════════════════════════════════════════════════╝\n");
+        std::fprintf(stderr, "--- Drop Rate:       %-34.2f %% ---\n", drop_rate);
     }
 
 private:

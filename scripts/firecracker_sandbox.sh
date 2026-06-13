@@ -1,7 +1,5 @@
 #!/bin/bash
-# =============================================================================
 # firecracker_sandbox.sh — IICPC Firecracker MicroVM Sandbox Runner
-# =============================================================================
 # Full hardware-level isolation for contestant code execution.
 # Each submission runs in its own microVM with separate kernel.
 #
@@ -17,7 +15,6 @@
 #   - /dev/kvm accessible
 #   - firecracker binary in PATH
 #   - vmlinux.bin + contestant_rootfs.ext4 in infra/firecracker/
-# =============================================================================
 
 set -euo pipefail
 
@@ -108,9 +105,7 @@ if [[ ! -f "$BASE_ROOTFS" ]]; then
     exit 1
 fi
 
-# =============================================================================
 # Phase 1: Compile contestant code (static glibc — Strategy 2)
-# =============================================================================
 log "Phase 1: Compiling with static glibc ($CFLAGS)"
 COMPILE_START=$(date +%s%N)
 
@@ -128,9 +123,7 @@ else
     exit 1
 fi
 
-# =============================================================================
 # Phase 2: Prepare rootfs (inject binary into copy of base image)
-# =============================================================================
 log "Phase 2: Preparing rootfs (injecting contestant binary)"
 
 # Copy base rootfs (CoW if possible)
@@ -164,9 +157,7 @@ else
     ok "Binary injected via debugfs"
 fi
 
-# =============================================================================
 # Phase 3: Start Firecracker MicroVM
-# =============================================================================
 log "Phase 3: Booting Firecracker MicroVM"
 rm -f "$API_SOCKET"
 
@@ -274,9 +265,7 @@ else
     ok "VM cold-booted in ${BOOT_MS}ms"
 fi
 
-# =============================================================================
 # Phase 3.5: Security hardening (post-boot)
-# =============================================================================
 log "Applying security hardening to VM..."
 
 # The guest rootfs init should:
@@ -296,9 +285,7 @@ log "Applying security hardening to VM..."
 #   - jailer support for additional namespace isolation (production)
 ok "Security: isolated kernel, no network, capped resources"
 
-# =============================================================================
 # Phase 4: Wait for execution + collect results (with optional profiling)
-# =============================================================================
 log "Phase 4: Running benchmark (timeout ${TIMEOUT_SEC}s)"
 
 BENCH_START=$(date +%s%N)
@@ -325,9 +312,7 @@ fi
 BENCH_END=$(date +%s%N)
 BENCH_MS=$(( (BENCH_END - BENCH_START) / 1000000 ))
 
-# =============================================================================
 # Phase 5: Parse results and score
-# =============================================================================
 log "Phase 5: Computing score"
 
 # Extract output from Firecracker log

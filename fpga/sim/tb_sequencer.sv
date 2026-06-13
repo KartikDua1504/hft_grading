@@ -1,6 +1,4 @@
-// =============================================================================
 // tb_sequencer.sv — Sequencer Testbench (SystemVerilog)
-// =============================================================================
 // Verifies:
 //   1. Strict monotonic sequence numbering
 //   2. Round-robin fairness across ports
@@ -10,23 +8,18 @@
 //   6. Protocol parser correctness
 //
 // Run with: make sim (uses Verilator or Vivado XSIM)
-// =============================================================================
 
 `timescale 1ns / 1ps
 
 module tb_sequencer;
 
-    // =========================================================================
     // Parameters
-    // =========================================================================
     localparam int NUM_PORTS   = 4;
     localparam int ORDER_BITS  = 512;
     localparam int RING_DEPTH  = 256;   // Small for testing
     localparam int CLK_PERIOD  = 4;     // 250 MHz = 4ns period
 
-    // =========================================================================
     // Signals
-    // =========================================================================
     logic                               clk;
     logic                               rst_n;
 
@@ -51,9 +44,7 @@ module tb_sequencer;
     logic [31:0]                        stat_drops;
     logic [NUM_PORTS-1:0]               stat_active;
 
-    // =========================================================================
     // DUT instantiation
-    // =========================================================================
     sequencer_core #(
         .NUM_PORTS   (NUM_PORTS),
         .ORDER_WIDTH (ORDER_BITS),
@@ -78,24 +69,18 @@ module tb_sequencer;
         .stat_port_active    (stat_active)
     );
 
-    // =========================================================================
     // Clock generation
-    // =========================================================================
     initial clk = 0;
     always #(CLK_PERIOD/2) clk = ~clk;
 
-    // =========================================================================
     // Test variables
-    // =========================================================================
     int errors = 0;
     int total_received = 0;
     logic [63:0] last_seq = 0;
     logic [63:0] last_ts = 0;
     int port_grant_count [NUM_PORTS];
 
-    // =========================================================================
     // Helper: create order data
-    // =========================================================================
     function automatic logic [ORDER_BITS-1:0] make_order(
         input logic [7:0] msg_type,
         input logic [7:0] side,
@@ -115,9 +100,7 @@ module tb_sequencer;
         return data;
     endfunction
 
-    // =========================================================================
     // Output monitor — verify invariants
-    // =========================================================================
     always @(posedge clk) begin
         if (out_valid && out_ready) begin
             total_received++;
@@ -142,9 +125,7 @@ module tb_sequencer;
         end
     end
 
-    // =========================================================================
     // Test sequence
-    // =========================================================================
     initial begin
         $dumpfile("dump.vcd");
         $dumpvars(0, tb_sequencer);
@@ -169,9 +150,7 @@ module tb_sequencer;
         rst_n = 1;
         repeat(5) @(posedge clk);
 
-        // =====================================================================
         // Test 1: Single port, sequential orders
-        // =====================================================================
         $display("\n[TEST 1] Single port, 100 sequential orders");
         for (int i = 0; i < 100; i++) begin
             @(posedge clk);
@@ -187,9 +166,7 @@ module tb_sequencer;
         $display("  Received: %0d, Seq: %0d, Errors: %0d",
                  total_received, last_seq, errors);
 
-        // =====================================================================
         // Test 2: All ports simultaneous (fairness test)
-        // =====================================================================
         $display("\n[TEST 2] All %0d ports simultaneous (fairness)", NUM_PORTS);
         for (int round = 0; round < 100; round++) begin
             @(posedge clk);
@@ -223,9 +200,7 @@ module tb_sequencer;
             end
         end
 
-        // =====================================================================
         // Test 3: Cancel requests
-        // =====================================================================
         $display("\n[TEST 3] Cancel requests (msg_type=11)");
         for (int i = 0; i < 10; i++) begin
             @(posedge clk);
@@ -239,9 +214,7 @@ module tb_sequencer;
         end
         repeat(10) @(posedge clk);
 
-        // =====================================================================
         // Test 4: Backpressure (consumer stalls)
-        // =====================================================================
         $display("\n[TEST 4] Backpressure test");
         out_ready = 0; // Stall consumer
         for (int i = 0; i < 20; i++) begin
@@ -257,9 +230,7 @@ module tb_sequencer;
         out_ready = 1; // Resume
         repeat(30) @(posedge clk);
 
-        // =====================================================================
         // Summary
-        // =====================================================================
         $display("\n=== RESULTS ===");
         $display("  Total sequenced:  %0d", stat_total);
         $display("  Total drops:      %0d", stat_drops);

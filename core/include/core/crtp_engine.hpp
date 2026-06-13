@@ -1,25 +1,14 @@
 #pragma once
-// =============================================================================
-// crtp_engine.hpp — CRTP Engine Base (Static Polymorphism, Zero vtable cost)
-// =============================================================================
+
+// --- CRTP Engine Base (Static Polymorphism) ---
 // Replaces virtual dispatch with Curiously Recurring Template Pattern.
-// The compiler resolves ALL method calls at compile-time → zero indirection,
-// full inlining, perfect branch prediction.
-//
-// Virtual dispatch cost on Alder Lake:
-//   - vtable lookup: ~5ns (L1 hit) to ~40ns (L3 if evicted)
-//   - indirect branch: ~15 cycle misprediction penalty
-//   - blocks inlining: compiler can't see through virtual calls
-//
-// CRTP cost: literally zero. The call IS the implementation after inlining.
+// All method calls resolved at compile-time — zero indirection, full inlining.
 //
 // Usage:
 //   class MyEngine : public EngineBase<MyEngine> {
-//       // Implement required hooks:
 //       void do_send_impl(BotFleet& fleet, std::size_t bot_idx) noexcept;
 //       std::size_t do_recv_impl(BotFleet& fleet, TelemetryRing& ring) noexcept;
 //   };
-// =============================================================================
 
 #include "core/types.hpp"
 #include "core/tsc.hpp"
@@ -32,21 +21,20 @@
 
 namespace iicpc {
 
-// =============================================================================
-// CRTP Engine Base — All engines derive from this
-// =============================================================================
+// --- Engine Base ---
+// All load generator engines derive from this.
 template<typename Derived>
 class EngineBase {
 public:
     using TelemetryRing = SPSCRingBuffer<LatencySample, 1048576>;
 
-    // No virtual destructor needed — CRTP is not used polymorphically at runtime
+    // No virtual destructor needed — CRTP is not polymorphic at runtime
     EngineBase() noexcept = default;
 
     /// Main hot loop — sends requests for idle bots, receives responses
     IICPC_HOT IICPC_FLATTEN
     std::size_t run_batch(BotFleet& fleet, TelemetryRing& ring) noexcept {
-        // Phase 1: Send for all IDLE bots (SoA scan — cache-friendly)
+        // Phase 1: Send for all IDLE bots (SoA scan)
         send_all(fleet);
 
         // Phase 2: Receive responses
@@ -57,7 +45,7 @@ public:
     [[nodiscard]] uint64_t total_recvs() const noexcept { return total_recvs_; }
 
 protected:
-    // CRTP dispatch — resolved at compile-time, zero overhead
+    // CRTP dispatch — resolved at compile-time
     Derived& self() noexcept { return static_cast<Derived&>(*this); }
     const Derived& self() const noexcept {
         return static_cast<const Derived&>(*this);
@@ -78,7 +66,7 @@ private:
 
             if (IICPC_UNLIKELY(fleet.states[i] != BotState::IDLE)) continue;
 
-            // CRTP dispatch — compiler inlines the concrete implementation
+            // CRTP dispatch — inlined by compiler
             self().do_send_impl(fleet, i);
             total_sends_++;
         }
@@ -86,16 +74,15 @@ private:
 
     IICPC_HOT
     std::size_t recv_all(BotFleet& fleet, TelemetryRing& ring) noexcept {
-        // CRTP dispatch — compiler inlines the concrete implementation
+        // CRTP dispatch — inlined by compiler
         std::size_t count = self().do_recv_impl(fleet, ring);
         total_recvs_ += count;
         return count;
     }
 };
 
-// =============================================================================
-// CRTP Exchange Base — For exchange-side processing
-// =============================================================================
+// --- Exchange Base ---
+// For exchange-side processing via CRTP.
 template<typename Derived>
 class ExchangeBase {
 public:
@@ -116,9 +103,8 @@ protected:
     uint64_t total_processed_ = 0;
 };
 
-// =============================================================================
-// CRTP Telemetry Consumer Base
-// =============================================================================
+// --- Telemetry Consumer Base ---
+// CRTP base for telemetry processing.
 template<typename Derived>
 class TelemetryBase {
 public:

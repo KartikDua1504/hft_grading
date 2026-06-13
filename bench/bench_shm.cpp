@@ -1,12 +1,9 @@
-// =============================================================================
 // bench_shm.cpp — Shared Memory Benchmark (Zero Syscall Hot Path)
-// =============================================================================
 // Pure userspace IPC: loadgen and exchange communicate via lock-free SPSC
 // ring buffers in shared memory. NO sockets, NO kernel, NO syscalls.
 //
-// This is the absolute performance ceiling for this architecture.
+// Shared-memory engine benchmark (maximum throughput ceiling).
 // Expected: <1µs p50 (cache-line transfer latency only)
-// =============================================================================
 
 #include "core/arena.hpp"
 #include "core/ring_buffer.hpp"
@@ -69,11 +66,9 @@ int main(int argc, char* argv[]) {
     ::signal(SIGPIPE, SIG_IGN);
 
     std::fprintf(stderr, "\n");
-    std::fprintf(stderr, "╔══════════════════════════════════════════════════════════╗\n");
-    std::fprintf(stderr, "║   SHARED MEMORY BENCHMARK (ZERO SYSCALLS)               ║\n");
-    std::fprintf(stderr, "║   Pure lock-free IPC: loadgen ↔ exchange                ║\n");
-    std::fprintf(stderr, "║   Target: <1µs p50, maximum TPS                         ║\n");
-    std::fprintf(stderr, "╚══════════════════════════════════════════════════════════╝\n\n");
+    std::fprintf(stderr, "--- SHARED MEMORY BENCHMARK (ZERO SYSCALLS) ---\n");
+    std::fprintf(stderr, "--- Pure lock-free IPC: loadgen ↔ exchange ---\n");
+    std::fprintf(stderr, "--- Target: <1µs p50, maximum TPS ---\n");
 
     // Arena
     HugePageArena arena;
@@ -186,33 +181,28 @@ int main(int argc, char* argv[]) {
     auto pct = consumer.latest_percentiles();
 
     std::fprintf(stderr, "\n");
-    std::fprintf(stderr, "╔══════════════════════════════════════════════════════════════╗\n");
-    std::fprintf(stderr, "║            SHARED MEMORY BENCHMARK RESULTS                  ║\n");
-    std::fprintf(stderr, "╠══════════════════════════════════════════════════════════════╣\n");
-    std::fprintf(stderr, "║  Duration:     %.2f seconds                                ║\n", elapsed);
-    std::fprintf(stderr, "║  Transport:    Shared Memory (zero syscalls)                 ║\n");
-    std::fprintf(stderr, "║  Bots:         %-44zu  ║\n", cfg.num_bots);
-    std::fprintf(stderr, "║  Channel Cap:  %-44zu  ║\n", CHANNEL_CAPACITY);
-    std::fprintf(stderr, "║                                                              ║\n");
-    std::fprintf(stderr, "║  Total Sends:  %-44lu  ║\n", sends);
-    std::fprintf(stderr, "║  Total Recvs:  %-44lu  ║\n", recvs);
-    std::fprintf(stderr, "║  Drops:        %-44lu  ║\n", drops);
-    std::fprintf(stderr, "║  TPS:          %-44.0f  ║\n", tps);
-    std::fprintf(stderr, "║                                                              ║\n");
-    std::fprintf(stderr, "║  Latency:                                                    ║\n");
-    std::fprintf(stderr, "║    min:   %10.2f µs                                       ║\n",
+    std::fprintf(stderr, "--- SHARED MEMORY BENCHMARK RESULTS ---\n");
+    std::fprintf(stderr, "--- Duration:     %.2f seconds ---\n", elapsed);
+    std::fprintf(stderr, "--- Transport:    Shared Memory (zero syscalls) ---\n");
+    std::fprintf(stderr, "--- Bots:         %-44zu ---\n", cfg.num_bots);
+    std::fprintf(stderr, "--- Channel Cap:  %-44zu ---\n", CHANNEL_CAPACITY);
+    std::fprintf(stderr, "--- Total Sends:  %-44lu ---\n", sends);
+    std::fprintf(stderr, "--- Total Recvs:  %-44lu ---\n", recvs);
+    std::fprintf(stderr, "--- Drops:        %-44lu ---\n", drops);
+    std::fprintf(stderr, "--- TPS:          %-44.0f ---\n", tps);
+    std::fprintf(stderr, "--- Latency: ---\n");
+    std::fprintf(stderr, "--- min:   %10.2f µs ---\n",
                  static_cast<double>(pct.min) / 1000.0);
-    std::fprintf(stderr, "║    p50:   %10.2f µs                                       ║\n",
+    std::fprintf(stderr, "--- p50:   %10.2f µs ---\n",
                  static_cast<double>(pct.p50) / 1000.0);
-    std::fprintf(stderr, "║    p90:   %10.2f µs                                       ║\n",
+    std::fprintf(stderr, "--- p90:   %10.2f µs ---\n",
                  static_cast<double>(pct.p90) / 1000.0);
-    std::fprintf(stderr, "║    p99:   %10.2f µs                                       ║\n",
+    std::fprintf(stderr, "--- p99:   %10.2f µs ---\n",
                  static_cast<double>(pct.p99) / 1000.0);
-    std::fprintf(stderr, "║    p999:  %10.2f µs                                       ║\n",
+    std::fprintf(stderr, "--- p999:  %10.2f µs ---\n",
                  static_cast<double>(pct.p999) / 1000.0);
-    std::fprintf(stderr, "║    max:   %10.2f µs                                       ║\n",
+    std::fprintf(stderr, "--- max:   %10.2f µs ---\n",
                  static_cast<double>(pct.max) / 1000.0);
-    std::fprintf(stderr, "║                                                              ║\n");
 
     const bool tps_1m = tps >= 1'000'000.0;
     const bool tps_5m = tps >= 5'000'000.0;
@@ -223,23 +213,22 @@ int main(int argc, char* argv[]) {
     const bool p99_10us = pct.p99 <= 10000;
     const bool p999_50us = pct.p999 <= 50000;
 
-    std::fprintf(stderr, "║  [%s] TPS ≥ 1M                                             ║\n",
+    std::fprintf(stderr, "--- [%s] TPS ≥ 1M ---\n",
                  tps_1m ? "✓" : "✗");
-    std::fprintf(stderr, "║  [%s] TPS ≥ 5M                                             ║\n",
+    std::fprintf(stderr, "--- [%s] TPS ≥ 5M ---\n",
                  tps_5m ? "✓" : "✗");
-    std::fprintf(stderr, "║  [%s] TPS ≥ 10M                                            ║\n",
+    std::fprintf(stderr, "--- [%s] TPS ≥ 10M ---\n",
                  tps_10m ? "✓" : "✗");
-    std::fprintf(stderr, "║  [%s] Zero drops                                           ║\n",
+    std::fprintf(stderr, "--- [%s] Zero drops ---\n",
                  drops_ok ? "✓" : "✗");
-    std::fprintf(stderr, "║  [%s] p50 < 1µs (physics limit)                            ║\n",
+    std::fprintf(stderr, "--- [%s] p50 < 1µs (physics limit) ---\n",
                  p50_1us ? "✓" : "✗");
-    std::fprintf(stderr, "║  [%s] p50 < 5µs (HFT-tier)                                ║\n",
+    std::fprintf(stderr, "--- [%s] p50 < 5µs (HFT-tier) ---\n",
                  p50_5us ? "✓" : "✗");
-    std::fprintf(stderr, "║  [%s] p99 < 10µs (ultra-deterministic)                     ║\n",
+    std::fprintf(stderr, "--- [%s] p99 < 10µs (ultra-deterministic) ---\n",
                  p99_10us ? "✓" : "✗");
-    std::fprintf(stderr, "║  [%s] p999 < 50µs                                          ║\n",
+    std::fprintf(stderr, "--- [%s] p999 < 50µs ---\n",
                  p999_50us ? "✓" : "✗");
-    std::fprintf(stderr, "╚══════════════════════════════════════════════════════════════╝\n");
 
     return 0;
 }

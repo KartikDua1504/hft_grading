@@ -1,7 +1,5 @@
 #pragma once
-// =============================================================================
 // pipeline_engine.hpp — Multiplexed Pipeline Engine (writev + readv)
-// =============================================================================
 // Instead of 1 socket per bot (N send() syscalls per batch), use a small pool
 // of connections and pipeline multiple bot messages through each socket.
 //
@@ -13,7 +11,6 @@
 //   - This reduces syscall count from N to 2*K per batch
 //
 // Expected improvement: from ~100µs to <20µs by eliminating syscall overhead
-// =============================================================================
 
 #include "core/types.hpp"
 #include "core/tsc.hpp"
@@ -37,9 +34,7 @@
 
 namespace iicpc {
 
-// =============================================================================
 // Compile-time configuration
-// =============================================================================
 template<std::size_t PoolSize = 4, std::size_t MaxBatch = 512>
 struct PipelineConfig {
     static constexpr std::size_t POOL_SIZE = PoolSize;
@@ -52,9 +47,7 @@ struct PipelineConfig {
     int cpu_affinity = -1;
 };
 
-// =============================================================================
 // Pipeline Engine — CRTP, multiplexed connections
-// =============================================================================
 template<std::size_t PoolSize = 4, std::size_t MaxBatch = 512>
 class PipelineEngine {
 public:
@@ -156,9 +149,7 @@ public:
     [[nodiscard]] uint64_t total_recvs() const noexcept { return total_recvs_; }
 
 private:
-    // =========================================================================
     // Pipelined send: gather all IDLE bots, writev per pipe
-    // =========================================================================
     IICPC_HOT
     void send_pipelined(BotFleet& fleet) noexcept {
         // Count messages per pipe
@@ -213,9 +204,7 @@ private:
         }
     }
 
-    // =========================================================================
     // Pipelined recv: read all available ACKs from all pipes
-    // =========================================================================
     IICPC_HOT
     std::size_t recv_pipelined(BotFleet& fleet, TelemetryRing& ring) noexcept {
         std::size_t total_recvd = 0;
@@ -264,9 +253,7 @@ private:
         return total_recvd;
     }
 
-    // =========================================================================
     // Socket helpers
-    // =========================================================================
     static int connect_tcp(const char* host, uint16_t port) noexcept {
         int fd = ::socket(AF_INET, SOCK_STREAM, 0);
         if (fd < 0) return -1;
@@ -302,9 +289,7 @@ private:
         return fd;
     }
 
-    // =========================================================================
     // Data members
-    // =========================================================================
     PipelineConfig<PoolSize, MaxBatch> config_{};
     int pool_fds_[POOL] = {};
     struct iovec* send_iovs_[POOL] = {};

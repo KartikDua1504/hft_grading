@@ -1,7 +1,5 @@
 #!/bin/bash
-# =============================================================================
 # sandbox_run.sh — IICPC Isolated Benchmark Runner
-# =============================================================================
 # Compiles and benchmarks contestant code inside an isolated sandbox using
 # Linux namespaces and cgroups v2 for deterministic, fair execution.
 #
@@ -11,7 +9,6 @@
 #   - cgroups v2 enabled (check: mount | grep cgroup2)
 #   - Build directory with run_contest binary
 #   - Sufficient permissions for namespace creation
-# =============================================================================
 
 set -euo pipefail
 

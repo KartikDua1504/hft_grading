@@ -1,12 +1,9 @@
 #pragma once
-// =============================================================================
-// market_data_gen.hpp — Deterministic Synthetic Market Data Generator
-// =============================================================================
-// Generates a realistic price walk with configurable parameters.
-// Deterministic: same seed → same sequence → fair scoring.
-//
-// All state on stack or arena — zero heap allocation.
-// =============================================================================
+
+// --- Deterministic Synthetic Market Data Generator ---
+// Generates an Ornstein-Uhlenbeck price walk.
+// Deterministic: same seed produces identical sequence for fair scoring.
+// Zero heap allocation.
 
 #include "sdk/protocol.hpp"
 #include "core/compiler_hints.hpp"
@@ -40,7 +37,7 @@ public:
     /// Generate next market data tick. Deterministic given seed.
     IICPC_HOT
     MarketUpdate next_tick(uint64_t timestamp_ns) noexcept {
-        // Simple Ornstein-Uhlenbeck price process
+        // Ornstein-Uhlenbeck price process
         double noise = next_gaussian() * cfg_.volatility *
                        static_cast<double>(cfg_.initial_price);
         double reversion = cfg_.mean_reversion *
@@ -56,11 +53,10 @@ public:
         int64_t mid = static_cast<int64_t>(mid_price_);
         mid = (mid / cfg_.tick_size) * cfg_.tick_size;
 
-        // Spread varies slightly
+        // Variable spread
         int64_t half_spread = cfg_.initial_spread / 2;
         half_spread += static_cast<int64_t>(next_uniform() * 3.0) * cfg_.tick_size;
 
-        // Build market update
         MarketUpdate update{};
         update.msg_type = MsgType::MARKET_UPDATE;
         update.instrument_id = 0;
@@ -86,7 +82,7 @@ public:
     [[nodiscard]] uint32_t sequence() const noexcept { return sequence_; }
 
 private:
-    // xoshiro256** PRNG — fast, deterministic, good quality
+    // xorshift PRNG — fast, deterministic
     uint64_t next_raw() noexcept {
         uint64_t s = rng_state_;
         s ^= s << 13;

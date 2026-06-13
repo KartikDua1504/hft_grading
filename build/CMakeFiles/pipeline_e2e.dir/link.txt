@@ -1,1 +1,0 @@
-/usr/bin/c++ -O3 -DNDEBUG -Wl,--dependency-file=CMakeFiles/pipeline_e2e.dir/link.d CMakeFiles/pipeline_e2e.dir/pipeline/src/pipeline_e2e.cpp.o -o pipeline_e2e  libiicpc_core.a libiicpc_loadgen.a libiicpc_telemetry.a libiicpc_core.a -lpthread

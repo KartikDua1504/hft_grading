@@ -1,6 +1,4 @@
-// =============================================================================
 // orchestrator_server.cpp — Async gRPC Benchmark Orchestrator
-// =============================================================================
 // Central control plane for managing benchmark workers, contestant sandboxes,
 // and leaderboard aggregation.
 //
@@ -9,7 +7,6 @@
 //   - Benchmark lifecycle: create → start → stream metrics → stop → score
 //   - Server-side streaming for real-time metrics
 //   - Leaderboard aggregation with scoring
-// =============================================================================
 
 #include <grpcpp/grpcpp.h>
 #include <grpcpp/health_check_service_interface.h>
@@ -34,9 +31,7 @@ using grpc::Status;
 
 namespace iicpc {
 
-// =============================================================================
 // Worker Registry
-// =============================================================================
 struct WorkerState {
     std::string worker_id;
     std::string hostname;
@@ -68,14 +63,10 @@ struct LeaderboardEntry_internal {
     uint64_t drops = 0;
 };
 
-// =============================================================================
 // Orchestrator Service Implementation
-// =============================================================================
 class OrchestratorServiceImpl final : public BenchmarkOrchestrator::Service {
 public:
-    // =========================================================================
     // Worker Registration
-    // =========================================================================
     Status RegisterWorker(ServerContext* /*ctx*/,
                           const WorkerInfo* request,
                           RegistrationAck* response) override {
@@ -102,9 +93,7 @@ public:
         return Status::OK;
     }
 
-    // =========================================================================
     // Heartbeat
-    // =========================================================================
     Status Heartbeat(ServerContext* /*ctx*/,
                      const HeartbeatRequest* request,
                      HeartbeatResponse* response) override {
@@ -122,9 +111,7 @@ public:
         return Status::OK;
     }
 
-    // =========================================================================
     // Start Benchmark
-    // =========================================================================
     Status StartBenchmark(ServerContext* /*ctx*/,
                           const BenchmarkConfig* request,
                           BenchmarkHandle* response) override {
@@ -160,9 +147,7 @@ public:
         return Status::OK;
     }
 
-    // =========================================================================
     // Stop Benchmark
-    // =========================================================================
     Status StopBenchmark(ServerContext* /*ctx*/,
                          const BenchmarkHandle* request,
                          BenchmarkResult* response) override {
@@ -197,9 +182,7 @@ public:
         return Status::OK;
     }
 
-    // =========================================================================
     // Get Benchmark Status
-    // =========================================================================
     Status GetBenchmarkStatus(ServerContext* /*ctx*/,
                               const BenchmarkHandle* request,
                               BenchmarkStatus* response) override {
@@ -220,9 +203,7 @@ public:
         return Status::OK;
     }
 
-    // =========================================================================
     // Stream Metrics (server-side streaming)
-    // =========================================================================
     Status StreamMetrics(ServerContext* ctx,
                          const BenchmarkHandle* request,
                          ServerWriter<MetricsSnapshot>* writer) override {
@@ -248,9 +229,7 @@ public:
         return Status::OK;
     }
 
-    // =========================================================================
     // Leaderboard
-    // =========================================================================
     Status GetLeaderboard(ServerContext* /*ctx*/,
                           const LeaderboardRequest* request,
                           Leaderboard* response) override {
@@ -280,9 +259,7 @@ public:
         return Status::OK;
     }
 
-    // =========================================================================
     // Ingest metrics from a worker (called internally, not via RPC)
-    // =========================================================================
     void ingest_metrics(const std::string& benchmark_id,
                         const MetricsSnapshot& snapshot) {
         std::lock_guard<std::mutex> lock(mu_);
@@ -334,9 +311,7 @@ private:
 
 } // namespace iicpc
 
-// =============================================================================
 // Main
-// =============================================================================
 static std::atomic<bool> g_shutdown{false};
 static void signal_handler(int) { g_shutdown.store(true); }
 
@@ -363,10 +338,8 @@ int main(int argc, char* argv[]) {
     }
 
     std::fprintf(stderr, "\n");
-    std::fprintf(stderr, "╔══════════════════════════════════════════════════════════╗\n");
-    std::fprintf(stderr, "║   IICPC Benchmark Orchestrator                          ║\n");
-    std::fprintf(stderr, "║   Listening on: %-40s  ║\n", listen_addr.c_str());
-    std::fprintf(stderr, "╚══════════════════════════════════════════════════════════╝\n\n");
+    std::fprintf(stderr, "--- IICPC Benchmark Orchestrator ---\n");
+    std::fprintf(stderr, "--- Listening on: %-40s ---\n", listen_addr.c_str());
 
     // Wait for shutdown
     while (!g_shutdown.load()) {

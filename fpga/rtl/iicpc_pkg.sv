@@ -1,36 +1,25 @@
-// =============================================================================
 // iicpc_pkg.sv — Shared Protocol Constants (SystemVerilog Package)
-// =============================================================================
 // All magic numbers for protocol decoding are defined here.
 // Shared between sequencer_core, match_engine_fpga, and testbenches.
-// =============================================================================
 
 `timescale 1ns / 1ps
 
 package iicpc_pkg;
 
-    // =========================================================================
     // Message Types (matches sdk/protocol.hpp MsgType enum)
-    // =========================================================================
     localparam logic [7:0] MSG_ORDER_ENTRY   = 8'd10;
     localparam logic [7:0] MSG_CANCEL_REQ    = 8'd11;
 
-    // =========================================================================
     // Side
-    // =========================================================================
     localparam logic [7:0] SIDE_BUY  = 8'd0;
     localparam logic [7:0] SIDE_SELL = 8'd1;
 
-    // =========================================================================
     // Order Type
-    // =========================================================================
     localparam logic [7:0] ORDER_LIMIT  = 8'd0;
     localparam logic [7:0] ORDER_MARKET = 8'd1;
     localparam logic [7:0] ORDER_IOC    = 8'd2;
 
-    // =========================================================================
     // Ack Status
-    // =========================================================================
     localparam logic [7:0] ACK_ACCEPTED         = 8'd0;
     localparam logic [7:0] ACK_REJECTED_PRICE   = 8'd1;
     localparam logic [7:0] ACK_REJECTED_QTY     = 8'd2;
@@ -39,9 +28,7 @@ package iicpc_pkg;
     localparam logic [7:0] ACK_REJECTED_UNKNOWN = 8'd5;
     localparam logic [7:0] ACK_CANCELLED        = 8'd6;
 
-    // =========================================================================
     // Pipeline / Performance constants
-    // =========================================================================
     localparam int MAX_SWEEP_DEPTH = 16;  // Max price levels consumed per aggressor
 
     // Clock frequency targets (for testbench reporting)

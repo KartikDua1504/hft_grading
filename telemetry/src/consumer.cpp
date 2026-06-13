@@ -1,6 +1,4 @@
-// =============================================================================
 // consumer.cpp — Telemetry Consumer Implementation
-// =============================================================================
 #include "telemetry/consumer.hpp"
 
 #include <cstdio>
@@ -49,7 +47,7 @@ void TelemetryConsumer::run(RingBuffer& ring) noexcept {
     std::fprintf(stderr, "[telemetry] Consumer started (report every %d ms)\n",
                  config_.report_interval_ms);
 
-    // === HOT LOOP: ZERO ALLOCATIONS ===
+    // --- HOT LOOP: ZERO ALLOCATIONS ---
     while (running_.load(std::memory_order_acquire)) {
         LatencySample sample;
 

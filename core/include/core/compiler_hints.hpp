@@ -1,11 +1,10 @@
 #pragma once
-// =============================================================================
-// compiler_hints.hpp — Branch prediction, prefetching, SIMD, and intrinsics
-// =============================================================================
-// Every hint here has measurable impact on the hot path.
-// These are the difference between "low-level code" and "engineered performance."
-//
-// SIMD: We provide AVX2 and AVX-512 wrappers for:
+
+// --- Branch Prediction Hints ---
+// Compiler Hints that help in optimizing branch prediction, prefetching data and SIMD intrinsics.
+// These will help in 
+//   - Better probability in latency-critical 
+//   - Prefetch data to be processed in cache before hand to save CPU cycles
 //   - Parallel key comparison (hash map probing)
 //   - Vectorized memcpy (cache-line copies)
 //   - Batch zero/fill operations
@@ -19,8 +18,7 @@
 namespace iicpc {
 
 // --- Branch prediction hints ---
-// GCC/Clang __builtin_expect. On Alder Lake P-cores, a mispredicted branch
-// costs ~15 cycles. A well-predicted branch costs ~1 cycle.
+// A mispredicted branch can costs around ~15 cycles. A well-predicted branch costs ~1 cycle.
 #define IICPC_LIKELY(x)   __builtin_expect(!!(x), 1)
 #define IICPC_UNLIKELY(x) __builtin_expect(!!(x), 0)
 
@@ -28,12 +26,11 @@ namespace iicpc {
 #define IICPC_ASSUME(expr) do { if (!(expr)) __builtin_unreachable(); } while(0)
 
 // --- Prefetch hints ---
-// L1 prefetch: 64 bytes. On Alder Lake, L1 latency ~4 cycles, L2 ~12, L3 ~40.
-// Prefetching saves the delta.
+// L1 prefetch: 64 bytes. On Intel AlderLake (x86), L1 latency ~4 cycles, L2 ~12, L3 ~40.
 
-/// Prefetch for read, into L1 cache (highest priority)
+/// Prefetch for read, into L1 cache 
 inline void prefetch_read_l1(const void* addr) noexcept {
-    __builtin_prefetch(addr, 0, 3);  // read, high temporal locality
+    __builtin_prefetch(addr, 0, 3); 
 }
 
 /// Prefetch for read, into L2 cache
@@ -41,17 +38,17 @@ inline void prefetch_read_l2(const void* addr) noexcept {
     __builtin_prefetch(addr, 0, 2);
 }
 
-/// Prefetch for write (exclusive access), into L1
+/// Prefetch for write into L1 cache
 inline void prefetch_write_l1(const void* addr) noexcept {
     __builtin_prefetch(addr, 1, 3);
 }
 
-/// Prefetch for write, into L2 (for arrays we'll write to soon)
+/// Prefetch for write, into L2 cache
 inline void prefetch_write_l2(const void* addr) noexcept {
     __builtin_prefetch(addr, 1, 2);
 }
 
-/// Prefetch a range of memory (for SoA array traversal)
+/// Prefetch all cache lines in a contiguous memory range
 template<std::size_t Stride = 64>
 inline void prefetch_range(const void* addr, std::size_t bytes) noexcept {
     const auto* p = static_cast<const char*>(addr);
@@ -60,7 +57,7 @@ inline void prefetch_range(const void* addr, std::size_t bytes) noexcept {
     }
 }
 
-/// Prefetch N cache lines ahead in an SoA array
+/// Prefetch elements ahead of current position
 template<typename T, std::size_t Ahead = 8>
 inline void prefetch_soa_ahead(const T* arr, std::size_t current_idx) noexcept {
     const std::size_t prefetch_idx = current_idx + Ahead;
@@ -80,17 +77,20 @@ inline void spin_wait(unsigned cycles) noexcept {
     }
 }
 
-// --- Memory barriers (lighter than atomics) ---
-/// Compiler-only barrier (no CPU fence, just prevents reordering)
+// --- Memory barriers (lighter than using atomics) ---
+/// Prevents compiler reordering of memory accesses.
+/// Does not emit an hardware fence.
 inline void compiler_barrier() noexcept {
     asm volatile("" ::: "memory");
 }
 
+//CPU instructions
 /// Store fence (ensures all prior stores are visible)
 inline void store_fence() noexcept {
     _mm_sfence();
 }
 
+// CPU instructions
 /// Load fence (ensures all prior loads are completed)  
 inline void load_fence() noexcept {
     _mm_lfence();
@@ -101,7 +101,7 @@ inline void load_fence() noexcept {
     __builtin_unreachable();
 }
 
-// --- Assume alignment (helps auto-vectorization) ---
+// --- Assume alignment (helps auto in vectorization) ---
 template<std::size_t Align, typename T>
 inline T* assume_aligned(T* ptr) noexcept {
     return static_cast<T*>(__builtin_assume_aligned(ptr, Align));
@@ -117,25 +117,18 @@ inline T* assume_aligned(T* ptr) noexcept {
 // --- Restrict pointer (C99 restrict for C++) ---
 #define IICPC_RESTRICT __restrict__
 
-// --- Tail call optimization hint (GCC 14+, Clang 13+) ---
+// --- Tail call optimization hint ---
 #if __has_attribute(musttail)
 #define IICPC_MUSTTAIL [[clang::musttail]]
 #else
 #define IICPC_MUSTTAIL
 #endif
 
-// =============================================================================
-// AVX2 SIMD Helpers — 256-bit (32 bytes) vectorized operations
-// =============================================================================
-// These provide massive speedups for hash map probing and data movement.
-// On Alder Lake P-cores, AVX2 instructions execute at 1-cycle throughput
-// on port 0/1, processing 4x int64 or 8x int32 per instruction.
-//
-// __attribute__((target("avx2"))) enables AVX2 per-function even when the
-// translation unit is compiled without -march=native. Required for targets
-// like exchange_local and run_contest that don't use iicpc_target_hotpath().
-// =============================================================================
+// --- AVX / AVX2 / AVX-512 Instructions ---
 
+/// Targets AVX2 (AVX-512 may not be available on all hardware)
+///
+/// AVX - 2
 #define IICPC_AVX2_TARGET __attribute__((target("avx2")))
 
 /// Compare 4 × int64 keys against a broadcast search key.
@@ -217,7 +210,7 @@ void avx2_stream_cacheline(void* IICPC_RESTRICT dst,
     _mm256_stream_si256(d + 1, b);
 }
 
-/// Vectorized batch comparison: find price in sorted SoA array.
+/// Vectorized batch comparison: find price in sorted array.
 /// Scans `count` elements in chunks of 4, returns index or UINT32_MAX.
 IICPC_FORCE_INLINE IICPC_AVX2_TARGET
 uint32_t avx2_linear_search_i64(const int64_t* arr, std::size_t count,
@@ -252,17 +245,10 @@ void avx2_zero_cachelines(void* dst, std::size_t num_cachelines) noexcept {
     for (std::size_t i = 0; i < num_cachelines * 2; ++i) {
         _mm256_stream_si256(d + i, vzero);
     }
-    _mm_sfence(); // Ensure streaming stores are globally visible
+    _mm_sfence(); 
 }
 
-// =============================================================================
-// AVX-512 SIMD Helpers — 512-bit (64 bytes = 1 cache line!) operations
-// =============================================================================
-// Available on Ice Lake / Sapphire Rapids server CPUs and Alder Lake P-cores
-// (with AVX-512 enabled in BIOS — disabled by default on consumer Alder Lake).
-//
-// Guard with __AVX512F__ so builds work on CPUs without AVX-512.
-// =============================================================================
+/// AVX - 512
 
 #ifdef __AVX512F__
 
@@ -349,9 +335,7 @@ void avx512_zero_cachelines(void* dst, std::size_t num_cachelines) noexcept {
 
 #endif // __AVX512F__
 
-// =============================================================================
-// Portable SIMD dispatch — automatically uses best available ISA
-// =============================================================================
+// PORTABLE SIMD DISPATCH — automatically uses best available ISA
 
 /// Find int64 key in array: AVX-512 → AVX2 → scalar fallback
 IICPC_FORCE_INLINE IICPC_AVX2_TARGET

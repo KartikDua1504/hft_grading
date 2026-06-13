@@ -1,11 +1,9 @@
 #pragma once
-// =============================================================================
-// flat_map.hpp — Robin Hood Open-Addressing Hash Map (Header-Only)
-// =============================================================================
-// Fixed-capacity, zero-allocation hash map for O(1) lookups on the hot path.
+
+// --- Robin Hood Open-Addressing Hash Map (Header-Only) ---
+// Fixed-capacity, zero-allocation hash map for O(1) lookups.
 // Uses Robin Hood hashing to keep probe sequences short.
-// All memory comes from the arena allocator.
-// =============================================================================
+// All memory from the arena allocator.
 
 #include "core/types.hpp"
 #include <cstdint>
@@ -15,7 +13,8 @@
 
 namespace iicpc {
 
-// FNV-1a hash — fast, good distribution, constexpr-friendly
+// --- FNV-1a Hash ---
+// Fast, good distribution, constexpr-friendly.
 constexpr uint64_t fnv1a_hash(const void* data, std::size_t len) noexcept {
     constexpr uint64_t FNV_OFFSET = 14695981039346656037ULL;
     constexpr uint64_t FNV_PRIME  = 1099511628211ULL;

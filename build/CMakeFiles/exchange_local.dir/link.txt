@@ -1,1 +1,0 @@
-/usr/bin/c++ -O3 -DNDEBUG -Wl,--dependency-file=CMakeFiles/exchange_local.dir/link.d CMakeFiles/exchange_local.dir/exchange/src/exchange_local.cpp.o -o exchange_local  libiicpc_core.a -lpthread

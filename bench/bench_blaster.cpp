@@ -1,12 +1,9 @@
-// =============================================================================
 // bench_blaster.cpp — Order Blaster Benchmark
-// =============================================================================
-// Standalone benchmark for the order generation firehose.
+// --- Order Blaster Throughput Benchmark ---
 // Measures: generation throughput, order mix, price distribution.
 // This proves the load generator can sustain the required TPS.
 //
 // Later: pipe these orders into a contestant's Firecracker VM.
-// =============================================================================
 
 #include "loadgen/order_blaster.hpp"
 #include "core/arena.hpp"
@@ -34,10 +31,8 @@ int main(int argc, char* argv[]) {
     }
 
     std::fprintf(stderr, "\n");
-    std::fprintf(stderr, "╔══════════════════════════════════════════════════════════╗\n");
-    std::fprintf(stderr, "║   IICPC Order Blaster Benchmark                         ║\n");
-    std::fprintf(stderr, "║   The Firehose — Deterministic Order Generation          ║\n");
-    std::fprintf(stderr, "╚══════════════════════════════════════════════════════════╝\n\n");
+    std::fprintf(stderr, "--- IICPC Order Blaster Benchmark ---\n");
+    std::fprintf(stderr, "--- Order Blaster Throughput Benchmark ---\n");
 
     // Arena
     HugePageArena arena;
@@ -134,26 +129,22 @@ int main(int argc, char* argv[]) {
     double tps = static_cast<double>(total_popped) / elapsed_secs;
 
     std::fprintf(stderr, "\n");
-    std::fprintf(stderr, "╔══════════════════════════════════════════════════════════════╗\n");
-    std::fprintf(stderr, "║              ORDER BLASTER RESULTS                          ║\n");
-    std::fprintf(stderr, "╠══════════════════════════════════════════════════════════════╣\n");
-    std::fprintf(stderr, "║  Duration:     %.2f seconds                                ║\n",
+    std::fprintf(stderr, "--- ORDER BLASTER RESULTS ---\n");
+    std::fprintf(stderr, "--- Duration:     %.2f seconds ---\n",
                  elapsed_secs);
-    std::fprintf(stderr, "║  Total Orders: %-44lu  ║\n", total_popped);
-    std::fprintf(stderr, "║  Throughput:   %-40.0f OPS  ║\n", tps);
-    std::fprintf(stderr, "║  Limits:       %-44lu  ║\n", blaster.total_limits());
-    std::fprintf(stderr, "║  Markets:      %-44lu  ║\n", blaster.total_markets());
-    std::fprintf(stderr, "║  Cancels:      %-44lu  ║\n", blaster.total_cancels());
-    std::fprintf(stderr, "╠══════════════════════════════════════════════════════════════╣\n");
-    std::fprintf(stderr, "║  TicketSpinlock: %.1f ns/cycle (uncontended)               ║\n",
+    std::fprintf(stderr, "--- Total Orders: %-44lu ---\n", total_popped);
+    std::fprintf(stderr, "--- Throughput:   %-40.0f OPS ---\n", tps);
+    std::fprintf(stderr, "--- Limits:       %-44lu ---\n", blaster.total_limits());
+    std::fprintf(stderr, "--- Markets:      %-44lu ---\n", blaster.total_markets());
+    std::fprintf(stderr, "--- Cancels:      %-44lu ---\n", blaster.total_cancels());
+    std::fprintf(stderr, "--- TicketSpinlock: %.1f ns/cycle (uncontended) ---\n",
                  0.0); // Already printed above
-    std::fprintf(stderr, "║  [%s] Deterministic (seed=%lu)                            ║\n",
+    std::fprintf(stderr, "--- [%s] Deterministic (seed=%lu) ---\n",
                  "✓", cfg.seed);
-    std::fprintf(stderr, "║  [%s] Zero heap allocation                                 ║\n",
+    std::fprintf(stderr, "--- [%s] Zero heap allocation ---\n",
                  "✓");
-    std::fprintf(stderr, "║  [%s] Lock-free ring buffer                                ║\n",
+    std::fprintf(stderr, "--- [%s] Lock-free ring buffer ---\n",
                  "✓");
-    std::fprintf(stderr, "╚══════════════════════════════════════════════════════════════╝\n");
 
     return 0;
 }

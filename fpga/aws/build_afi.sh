@@ -1,7 +1,5 @@
 #!/bin/bash
-# =============================================================================
 # build_afi.sh — Build Amazon FPGA Image from SystemVerilog
-# =============================================================================
 # Runs on an AWS m5.4xlarge (NOT f2 — cheaper for synthesis)
 #
 # Prerequisites:
@@ -16,7 +14,6 @@
 #   4. Returns afi-id for loading onto f2 instance
 #
 # Usage: ./build_afi.sh
-# =============================================================================
 
 set -euo pipefail
 
@@ -41,9 +38,7 @@ echo "  HDK:      $HDK_DIR"
 echo "  Output:   $BUILD_DIR"
 echo ""
 
-# =============================================================================
 # Step 1: Set up HDK environment
-# =============================================================================
 echo "[1/4] Setting up AWS FPGA HDK..."
 if [[ -f "$HDK_DIR/../hdk_setup.sh" ]]; then
     source "$HDK_DIR/../hdk_setup.sh" 2>/dev/null || true
@@ -51,9 +46,7 @@ else
     echo "WARNING: HDK setup script not found. Ensure Vivado is in PATH."
 fi
 
-# =============================================================================
 # Step 2: Create Vivado project and run synthesis
-# =============================================================================
 echo "[2/4] Running Vivado synthesis (this takes 2-4 hours)..."
 
 cat > "$BUILD_DIR/synth.tcl" << 'TCL_EOF'
@@ -93,9 +86,7 @@ TCL_EOF
 cd "$BUILD_DIR"
 vivado -mode batch -source synth.tcl -tclargs "$RTL_DIR" 2>&1 | tee synth.log
 
-# =============================================================================
 # Step 3: Create tarball for AFI submission
-# =============================================================================
 echo "[3/4] Packaging DCP for AFI submission..."
 
 tar -czf "$BUILD_DIR/sequencer.tar.gz" -C "$BUILD_DIR" design.dcp
@@ -104,9 +95,7 @@ tar -czf "$BUILD_DIR/sequencer.tar.gz" -C "$BUILD_DIR" design.dcp
 aws s3 cp "$BUILD_DIR/sequencer.tar.gz" \
     "s3://${S3_BUCKET}/${S3_PREFIX}/sequencer.tar.gz"
 
-# =============================================================================
 # Step 4: Submit AFI creation request
-# =============================================================================
 echo "[4/4] Submitting AFI creation request..."
 
 AFI_RESULT=$(aws ec2 create-fpga-image \
@@ -120,18 +109,16 @@ AFI_ID=$(echo "$AFI_RESULT" | awk '{print $1}')
 AGFI_ID=$(echo "$AFI_RESULT" | awk '{print $2}')
 
 echo ""
-echo "╔════════════════════════════════════════════════════╗"
-echo "║  AFI Submission Complete                           ║"
-echo "╠════════════════════════════════════════════════════╣"
-echo "║  AFI ID:  $AFI_ID"
-echo "║  AGFI ID: $AGFI_ID"
-echo "║                                                    ║"
-echo "║  Check status:                                     ║"
-echo "║  aws ec2 describe-fpga-images --fpga-image-ids $AFI_ID"
-echo "║                                                    ║"
-echo "║  Load onto F2 instance:                            ║"
-echo "║  sudo fpga-load-local-image -S 0 -I $AGFI_ID"
-echo "╚════════════════════════════════════════════════════╝"
+echo "--- AFI Submission Complete ---"
+echo "  AFI Submission Complete                           "
+echo "  AFI ID:  $AFI_ID"
+echo "  AGFI ID: $AGFI_ID"
+echo "                                                    "
+echo "  Check status:                                     "
+echo "  aws ec2 describe-fpga-images --fpga-image-ids $AFI_ID"
+echo "                                                    "
+echo "  Load onto F2 instance:                            "
+echo "  sudo fpga-load-local-image -S 0 -I $AGFI_ID"
 
 # Save IDs
 echo "$AFI_ID" > "$BUILD_DIR/afi_id.txt"

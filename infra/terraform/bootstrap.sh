@@ -1,13 +1,10 @@
 #!/bin/bash
-# =============================================================================
 # bootstrap.sh — Fully Automated Arena Provisioning
-# =============================================================================
 # Runs as EC2 user-data on first boot. Zero manual intervention.
 # After this completes, the arena is ready to receive contestant code.
 #
 # Installs: Docker, Docker Compose, GCC 14, CMake, Python 3.12, Node 22,
 #           Firecracker, NGINX, and builds the entire C++ engine.
-# =============================================================================
 
 set -euo pipefail
 exec > /var/log/iicpc-bootstrap.log 2>&1
@@ -16,9 +13,7 @@ echo "=== IICPC Bootstrap started at $(date) ==="
 export DEBIAN_FRONTEND=noninteractive
 IICPC_HOME="/opt/iicpc"
 
-# =============================================================================
 # 1. System packages
-# =============================================================================
 echo "[1/10] Installing system packages..."
 apt-get update -qq
 apt-get install -y -qq \
@@ -34,9 +29,7 @@ apt-get install -y -qq \
 update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-14 100
 update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-14 100
 
-# =============================================================================
 # 2. Docker
-# =============================================================================
 echo "[2/10] Installing Docker..."
 install -m 0755 -d /etc/apt/keyrings
 curl -fsSL https://download.docker.com/linux/ubuntu/gpg | \
@@ -49,16 +42,12 @@ apt-get install -y -qq docker-ce docker-ce-cli containerd.io \
     docker-buildx-plugin docker-compose-plugin
 usermod -aG docker ubuntu
 
-# =============================================================================
 # 3. Node.js 22 (for SvelteKit frontend)
-# =============================================================================
 echo "[3/10] Installing Node.js 22..."
 curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
 apt-get install -y -qq nodejs
 
-# =============================================================================
 # 4. Performance tuning (bare metal)
-# =============================================================================
 echo "[4/10] Configuring performance mode..."
 
 # Hugepages: 2GB reserved (1024 x 2MB pages)
@@ -87,9 +76,7 @@ if ! grep -q "isolcpus" "$GRUB_FILE"; then
     echo "NOTE: isolcpus configured. Reboot required for effect."
 fi
 
-# =============================================================================
 # 5. Firecracker
-# =============================================================================
 echo "[5/10] Installing Firecracker..."
 FC_VERSION="1.7.0"
 FC_ARCH="x86_64"
@@ -106,9 +93,7 @@ curl -fsSL -o /opt/firecracker/vmlinux.bin \
     "https://s3.amazonaws.com/spec.ccfc.min/ci-artifacts/kernels/${FC_ARCH}/vmlinux-5.10.217" || \
     echo "WARNING: Firecracker kernel download failed (manual download needed)"
 
-# =============================================================================
 # 6. Clone and build the C++ engine
-# =============================================================================
 echo "[6/10] Building IICPC C++ engine..."
 mkdir -p ${IICPC_HOME}
 
@@ -128,27 +113,21 @@ else
     echo "C++ source not found yet — will build after sync"
 fi
 
-# =============================================================================
 # 7. Build Alpine rootfs for contestants
-# =============================================================================
 echo "[7/10] Building Alpine rootfs..."
 if [ -f "${IICPC_HOME}/scripts/build_rootfs.sh" ]; then
     chmod +x ${IICPC_HOME}/scripts/build_rootfs.sh
     bash ${IICPC_HOME}/scripts/build_rootfs.sh /opt/firecracker/contestant_rootfs.ext4
 fi
 
-# =============================================================================
 # 8. Start Docker services (Redis, QuestDB, Redpanda)
-# =============================================================================
 echo "[8/10] Starting Docker services..."
 if [ -f "${IICPC_HOME}/infra/docker/docker-compose.yml" ]; then
     cd ${IICPC_HOME}/infra/docker
     docker compose up -d
 fi
 
-# =============================================================================
 # 9. Python backend
-# =============================================================================
 echo "[9/10] Setting up Python backend..."
 python3.12 -m venv /opt/iicpc-venv
 source /opt/iicpc-venv/bin/activate
@@ -158,9 +137,7 @@ pip install --quiet \
     pyjwt passlib[bcrypt] httpx \
     websockets
 
-# =============================================================================
 # 10. NGINX configuration
-# =============================================================================
 echo "[10/10] Configuring NGINX..."
 cat > /etc/nginx/sites-available/iicpc << 'NGINX_CONF'
 upstream api_backend {
@@ -218,9 +195,7 @@ ln -sf /etc/nginx/sites-available/iicpc /etc/nginx/sites-enabled/
 rm -f /etc/nginx/sites-enabled/default
 nginx -t && systemctl restart nginx
 
-# =============================================================================
 # Create systemd service for FastAPI
-# =============================================================================
 cat > /etc/systemd/system/iicpc-api.service << 'SERVICE'
 [Unit]
 Description=IICPC Competition API

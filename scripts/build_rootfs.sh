@@ -1,7 +1,5 @@
 #!/bin/bash
-# =============================================================================
 # build_rootfs.sh — Create Minimal Alpine Rootfs for Firecracker
-# =============================================================================
 # Produces the SMALLEST possible Linux rootfs that can run a statically-linked
 # C/C++ binary. Nothing else. No shell, no package manager, no extra tools.
 #
@@ -14,7 +12,6 @@
 #   /dev, /proc, /sys   → Minimal device nodes
 #
 # Usage: sudo ./build_rootfs.sh [output_path]
-# =============================================================================
 
 set -euo pipefail
 
@@ -30,25 +27,19 @@ echo "  Output: ${OUTPUT}"
 echo "  Size:   ${IMAGE_SIZE_MB}MB"
 echo ""
 
-# ============================================================
 # 1. Create ext4 image
-# ============================================================
 echo "[1/6] Creating ${IMAGE_SIZE_MB}MB ext4 image..."
 dd if=/dev/zero of="${OUTPUT}" bs=1M count=${IMAGE_SIZE_MB} status=none
 mkfs.ext4 -F -q -L "iicpc_rootfs" "${OUTPUT}"
 
-# ============================================================
 # 2. Mount and populate
-# ============================================================
 echo "[2/6] Mounting image..."
 mkdir -p "${ROOTFS_DIR}"
 mount -o loop "${OUTPUT}" "${ROOTFS_DIR}"
 
 trap "umount ${ROOTFS_DIR} 2>/dev/null; rm -rf ${ROOTFS_DIR}" EXIT
 
-# ============================================================
 # 3. Install Alpine minirootfs
-# ============================================================
 echo "[3/6] Installing Alpine ${ALPINE_VERSION} minirootfs..."
 MINIROOTFS_URL="${ALPINE_MIRROR}/v${ALPINE_VERSION}/releases/${ALPINE_ARCH}/alpine-minirootfs-${ALPINE_VERSION}.0-${ALPINE_ARCH}.tar.gz"
 
@@ -65,9 +56,7 @@ fi
 
 tar xzf "${TARBALL}" -C "${ROOTFS_DIR}"
 
-# ============================================================
 # 4. Minimal init system
-# ============================================================
 echo "[4/6] Configuring minimal init..."
 
 # Create the init script that launches the contestant binary
@@ -118,9 +107,7 @@ cat > "${ROOTFS_DIR}/etc/inittab" << 'INITTAB_EOF'
 ::shutdown:/bin/umount -a -r
 INITTAB_EOF
 
-# ============================================================
 # 5. Strip unnecessary files
-# ============================================================
 echo "[5/6] Stripping unnecessary files..."
 
 # Remove everything we don't need
@@ -149,9 +136,7 @@ mkdir -p "${ROOTFS_DIR}/dev"
 mkdir -p "${ROOTFS_DIR}/proc"
 mkdir -p "${ROOTFS_DIR}/sys"
 
-# ============================================================
 # 6. Report
-# ============================================================
 echo "[6/6] Finalizing..."
 
 # Umount handled by trap
@@ -159,12 +144,9 @@ sync
 
 USED=$(du -sh "${ROOTFS_DIR}" | cut -f1)
 echo ""
-echo "╔════════════════════════════════════════════════════════╗"
-echo "║  Rootfs built successfully                            ║"
-echo "╠════════════════════════════════════════════════════════╣"
-echo "║  Image:     ${OUTPUT}"
-echo "║  Used:      ${USED}"
-echo "║  Init:      /init (launches /usr/bin/contestant)"
-echo "║  Socket:    /tmp/gateway.sock"
-echo "║  Base:      Alpine ${ALPINE_VERSION} musl libc"
-echo "╚════════════════════════════════════════════════════════╝"
+echo "  Rootfs built successfully"
+echo "  Image:     ${OUTPUT}"
+echo "  Used:      ${USED}"
+echo "  Init:      /init (launches /usr/bin/contestant)"
+echo "  Socket:    /tmp/gateway.sock"
+echo "  Base:      Alpine ${ALPINE_VERSION} musl libc"

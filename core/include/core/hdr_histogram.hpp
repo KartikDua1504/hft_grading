@@ -1,7 +1,6 @@
 #pragma once
-// =============================================================================
-// hdr_histogram.hpp — Bounded-Memory HDR Histogram for Latency Percentiles
-// =============================================================================
+
+// --- Bounded-Memory HDR Histogram for Latency Percentiles ---
 #include "core/types.hpp"
 #include <cstdint>
 #include <cstdio>

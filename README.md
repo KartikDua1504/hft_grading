@@ -2,8 +2,8 @@
   <h1 align="center">IICPC</h1>
   <p align="center"><strong>High-Frequency Trading Arena</strong></p>
   <p align="center">
-    An institutional-grade benchmarking platform for competitive orderbook engineering.<br/>
-    Submit your C++ matching engine. Get scored on correctness, throughput, and tail latency.
+    A benchmarking platform for competitive orderbook matching engine development.<br/>
+    Contestants submit C++ matching engines. Scoring: correctness, throughput, tail latency.
   </p>
 </p>
 
@@ -22,15 +22,13 @@
 
 ## What Is This?
 
-IICPC is a **competitive programming platform** where teams write C++ orderbook matching engines and submit them for automated benchmarking. The platform:
+IICPC is a **competitive benchmarking platform** where teams write C++ orderbook matching engines and submit them for automated evaluation. The platform:
 
-1. **Compiles** your code with `-O3 -march=native -static` (static glibc linking)
-2. **Isolates** execution in a **Firecracker MicroVM** — separate kernel per contestant, zero shared attack surface
-3. **Blasts** millions of deterministic orders through your engine
+1. **Compiles** contestant code with `-O3 -march=native -static` (static glibc linking)
+2. **Isolates** execution in a **Firecracker MicroVM** — separate kernel per contestant
+3. **Generates** millions of deterministic orders via a seeded PRNG order blaster
 4. **Validates** every fill against a shadow reference orderbook
-5. **Scores** you on correctness (40%), throughput (30%), and p99 latency (30%)
-
-Think [IMC Prosperity](https://prosperity.imc.com/) meets [Codeforces](https://codeforces.com/), but for systems programming.
+5. **Scores** on correctness (40%), throughput (30%), and p99 latency (30%)
 
 ---
 
@@ -232,23 +230,39 @@ firecracker --version  # Should show v1.15+
 
 ---
 
-## System Hardening (Production)
+## System Hardening
 
-For deterministic benchmark results, run the hardening script:
+The hardening script supports two modes:
 
+**Perf Mode (default)** — Maximum throughput for benchmarks and demos:
 ```bash
-sudo ./scripts/harden_determinism.sh
+sudo ./scripts/harden_determinism.sh                # or --mode perf
 ```
 
-This configures:
+**Determinism Mode** — Stable clocks for reproducible A/B testing:
+```bash
+sudo ./scripts/harden_determinism.sh --mode determinism
+```
+
+Both modes configure:
 - CPU governor → `performance` (no frequency scaling)
-- Turbo Boost → disabled (no frequency jitter)
 - HugePages → 512 × 2MB = 1GB pre-allocated
 - THP → disabled (no compaction stalls)
 - Swappiness → 0 (no swap interference)
 - NMI watchdog → disabled (fewer interrupts)
 - Network buffers → 16MB (no packet drops)
 - cgroups v2 → subtree delegation enabled
+
+**Perf mode** additionally:
+- Turbo Boost → **enabled** (P-cores boost to 4.7 GHz)
+- Alder Lake E-cores → **parked** (prevents scheduler migration to slow efficiency cores)
+
+**Determinism mode** additionally:
+- Turbo Boost → **disabled** (base clock only, no thermal jitter)
+
+> **Note (Alder Lake / Hybrid CPUs):** The script auto-detects Intel hybrid CPUs (P-cores vs E-cores)
+> and parks E-cores in perf mode. This prevents the Linux scheduler from migrating hot-path threads
+> to the slower Gracemont efficiency cores, which can cause a 2-3x throughput drop.
 
 ---
 
@@ -339,7 +353,7 @@ IICPC/
 │   └── bench_pipeline.cpp
 │
 ├── docs/
-│   └── ARCHITECTURE_BOOK.md # Comprehensive technical manifesto
+│   └── ARCHITECTURE_BOOK.md # System architecture reference
 │
 └── CMakeLists.txt           # Build configuration
 ```
@@ -603,5 +617,5 @@ MIT
 ---
 
 <p align="center">
-  <strong>IICPC</strong> — Where nanoseconds matter.
+  <strong>IICPC</strong>
 </p>

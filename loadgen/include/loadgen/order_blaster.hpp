@@ -1,21 +1,11 @@
 #pragma once
-// =============================================================================
-// order_blaster.hpp — High-Throughput Order Generator (The "Firehose")
-// =============================================================================
-// THIS IS THE CORE OF THE PIVOT.
-//
-// Old model: We build the exchange, contestants write strategies.
-// NEW model: Contestants build the orderbook, WE blast orders at it.
-//
-// This generates realistic exchange order flow:
+// --- High-Throughput Deterministic Order Generator ---
+// Generates exchange order flow for contestant benchmarking:
 //   - Limit orders (BUY/SELL at various price levels)
 //   - Market orders (immediate execution)
 //   - Cancel requests
-//   - Deterministic (same seed = same order sequence = fair scoring)
-//
-// Uses CRTP EngineBase for zero-overhead dispatch.
+// Deterministic: same seed produces identical order sequence.
 // All order state in SoA arrays from HugePageArena.
-// =============================================================================
 
 #include "core/types.hpp"
 #include "core/tsc.hpp"
@@ -31,9 +21,7 @@
 
 namespace iicpc {
 
-// =============================================================================
 // Order Generation Config (deterministic)
-// =============================================================================
 struct OrderBlasterConfig {
     // Price parameters
     int64_t  initial_mid     = 1000000;  // $100.00 scaled
@@ -57,9 +45,7 @@ struct OrderBlasterConfig {
     uint32_t orders_per_batch = 64;      // Orders generated per batch call
 };
 
-// =============================================================================
 // Order Blaster State (SoA — cache-friendly iteration)
-// =============================================================================
 struct BlasterState {
     // SoA arrays for active order tracking
     uint32_t* order_ids        = nullptr; // Client order IDs we've sent
@@ -106,9 +92,7 @@ struct BlasterState {
     }
 };
 
-// =============================================================================
 // Outbound order buffer (ring of orders to send to contestant)
-// =============================================================================
 inline constexpr uint32_t BLAST_RING_SIZE = 65536;
 
 struct BlastOrder {
@@ -117,9 +101,7 @@ struct BlastOrder {
     MsgType  type;                // ORDER_ENTRY or CANCEL_REQUEST
 };
 
-// =============================================================================
 // Order Blaster — Generates order flow, writes into ring buffer
-// =============================================================================
 class OrderBlaster {
 public:
     OrderBlaster() noexcept = default;

@@ -1,6 +1,4 @@
-// =============================================================================
 // dma_ring.sv — PCIe DMA Ring Buffer (SystemVerilog)
-// =============================================================================
 // FPGA-side ring buffer for sequenced orders.
 // FPGA writes sequenced orders → Host CPU reads via PCIe BAR MMIO.
 //
@@ -19,7 +17,6 @@
 //   0x1000: ring_data[] (RO, sequenced order entries)
 //
 // Each ring entry: 128 bytes (seq_no + timestamp + contestant_id + order)
-// =============================================================================
 
 `timescale 1ns / 1ps
 `default_nettype none
@@ -32,16 +29,12 @@ module dma_ring #(
     input  wire                     clk,
     input  wire                     rst_n,
 
-    // =========================================================================
     // Write port (from sequencer_core)
-    // =========================================================================
     input  wire                     wr_valid,
     input  wire [ENTRY_WIDTH-1:0]   wr_data,
     output logic                    wr_ready,
 
-    // =========================================================================
     // Host MMIO interface (simplified AXI-Lite slave)
-    // =========================================================================
     input  wire                     host_rd_en,
     input  wire [15:0]              host_rd_addr,
     output logic [31:0]             host_rd_data,
@@ -51,9 +44,7 @@ module dma_ring #(
     input  wire [15:0]              host_wr_addr,
     input  wire [31:0]              host_wr_data,
 
-    // =========================================================================
     // Status
-    // =========================================================================
     output logic [31:0]             stat_write_ptr,
     output logic [31:0]             stat_occupancy,
     output logic [31:0]             stat_drops,
@@ -61,23 +52,17 @@ module dma_ring #(
     output logic                    stat_empty
 );
 
-    // =========================================================================
     // Ring pointers
-    // =========================================================================
     logic [ADDR_WIDTH-1:0] write_ptr;
     logic [ADDR_WIDTH-1:0] read_ptr;     // Written by host via MMIO
     logic [31:0]           drop_count;
 
-    // =========================================================================
     // Ring memory (BRAM)
-    // =========================================================================
     // Inferred as Block RAM by synthesis
     (* ram_style = "block" *)
     logic [ENTRY_WIDTH-1:0] ring_mem [0:DEPTH-1];
 
-    // =========================================================================
     // Occupancy calculation
-    // =========================================================================
     wire [ADDR_WIDTH:0] occupancy = write_ptr - read_ptr;
     wire                is_full   = (occupancy >= DEPTH - 1);
     wire                is_empty  = (write_ptr == read_ptr);
@@ -89,9 +74,7 @@ module dma_ring #(
     assign stat_full      = is_full;
     assign stat_empty     = is_empty;
 
-    // =========================================================================
     // Write logic (FPGA side)
-    // =========================================================================
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
             write_ptr  <= '0;
@@ -108,9 +91,7 @@ module dma_ring #(
         end
     end
 
-    // =========================================================================
     // Host read logic (MMIO BAR)
-    // =========================================================================
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
             host_rd_data  <= '0;

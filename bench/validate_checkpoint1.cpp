@@ -1,10 +1,7 @@
-// =============================================================================
 // validate_checkpoint1.cpp — Full Stage 1 Pipeline Validation
-// =============================================================================
 // Orchestrates: Arena → Ring Buffer → Load Generator → Telemetry Consumer
 // Launches dummy exchange as a child process, runs the benchmark for a
 // configurable duration, and validates all Checkpoint 1 criteria.
-// =============================================================================
 
 #include "core/arena.hpp"
 #include "core/ring_buffer.hpp"
@@ -31,7 +28,7 @@ using namespace iicpc;
 static volatile sig_atomic_t g_running = 1;
 static void signal_handler(int) { g_running = 0; }
 
-// === Checkpoint validation results ===
+// --- Checkpoint validation results ---
 struct CheckpointResult {
     bool arena_aligned = false;
     bool ring_cache_lines = false;
@@ -45,26 +42,22 @@ struct CheckpointResult {
 
 static void print_results(const CheckpointResult& r) {
     std::fprintf(stderr, "\n");
-    std::fprintf(stderr, "╔══════════════════════════════════════════════════════════╗\n");
-    std::fprintf(stderr, "║           CHECKPOINT 1 VALIDATION RESULTS               ║\n");
-    std::fprintf(stderr, "╠══════════════════════════════════════════════════════════╣\n");
-    std::fprintf(stderr, "║ [%s] Arena: 64-byte aligned allocations              ║\n",
+    std::fprintf(stderr, "--- CHECKPOINT 1 VALIDATION RESULTS ---\n");
+    std::fprintf(stderr, "--- [%s] Arena: 64-byte aligned allocations ---\n",
                  r.arena_aligned ? "✓" : "✗");
-    std::fprintf(stderr, "║ [%s] Ring buffer: indices on separate cache lines     ║\n",
+    std::fprintf(stderr, "--- [%s] Ring buffer: indices on separate cache lines ---\n",
                  r.ring_cache_lines ? "✓" : "✗");
-    std::fprintf(stderr, "║ [%s] Load generator: ≥100,000 TPS (achieved: %.0f)  ║\n",
+    std::fprintf(stderr, "--- [%s] Load generator: ≥100,000 TPS (achieved: %.0f) ---\n",
                  r.tps_achieved ? "✓" : "✗", r.achieved_tps);
-    std::fprintf(stderr, "║ [%s] Telemetry: zero dropped packets (%lu dropped)   ║\n",
+    std::fprintf(stderr, "--- [%s] Telemetry: zero dropped packets (%lu dropped) ---\n",
                  r.zero_drops ? "✓" : "✗", r.dropped);
-    std::fprintf(stderr, "║ [%s] Telemetry: valid percentile output               ║\n",
+    std::fprintf(stderr, "--- [%s] Telemetry: valid percentile output ---\n",
                  r.percentiles_valid ? "✓" : "✗");
-    std::fprintf(stderr, "╠══════════════════════════════════════════════════════════╣\n");
 
     const bool all_pass = r.arena_aligned && r.ring_cache_lines &&
                           r.tps_achieved && r.zero_drops && r.percentiles_valid;
-    std::fprintf(stderr, "║                  OVERALL: %s                          ║\n",
+    std::fprintf(stderr, "--- OVERALL: %s ---\n",
                  all_pass ? "✅ PASS" : "❌ FAIL");
-    std::fprintf(stderr, "╚══════════════════════════════════════════════════════════╝\n");
 }
 
 int main(int argc, char* argv[]) {
@@ -87,9 +80,7 @@ int main(int argc, char* argv[]) {
 
     CheckpointResult result{};
 
-    // =========================================================================
     // Step 1: Initialize the arena
-    // =========================================================================
     std::fprintf(stderr, "\n=== Step 1: Arena Allocator ===\n");
     HugePageArena arena;
     (void)arena.init(512 * 1024 * 1024); // 512 MiB for validation
@@ -106,15 +97,11 @@ int main(int argc, char* argv[]) {
                  result.arena_aligned ? "PASS" : "FAIL");
     arena.reset();
 
-    // =========================================================================
     // Step 2: Calibrate TSC
-    // =========================================================================
     std::fprintf(stderr, "\n=== Step 2: TSC Calibration ===\n");
     auto tsc_cal = calibrate_tsc();
 
-    // =========================================================================
     // Step 3: Create ring buffer and verify cache line separation
-    // =========================================================================
     std::fprintf(stderr, "\n=== Step 3: Ring Buffer ===\n");
     using TelemetryRing = SPSCRingBuffer<LatencySample, 1048576>;
 
@@ -126,9 +113,7 @@ int main(int argc, char* argv[]) {
     std::fprintf(stderr, "[check] Ring buffer cache line separation: %s\n",
                  result.ring_cache_lines ? "PASS" : "FAIL");
 
-    // =========================================================================
     // Step 4: Start dummy exchange (child process)
-    // =========================================================================
     std::fprintf(stderr, "\n=== Step 4: Starting Dummy Exchange ===\n");
     pid_t exchange_pid = fork();
     if (exchange_pid == 0) {
@@ -144,9 +129,7 @@ int main(int argc, char* argv[]) {
     // Wait for exchange to be ready
     std::this_thread::sleep_for(std::chrono::milliseconds(500));
 
-    // =========================================================================
     // Step 5: Initialize bot fleet and payloads
-    // =========================================================================
     std::fprintf(stderr, "\n=== Step 5: Bot Fleet (%zu bots) ===\n", num_bots);
     BotFleet fleet;
     if (!fleet.init(arena, num_bots)) {
@@ -161,9 +144,7 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    // =========================================================================
     // Step 6: Initialize I/O engine
-    // =========================================================================
     std::fprintf(stderr, "\n=== Step 6: I/O Engine ===\n");
     IoEngine* engine = create_io_engine(arena);
     IoEngineConfig io_config{};
@@ -178,9 +159,7 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    // =========================================================================
     // Step 7: Start telemetry consumer thread
-    // =========================================================================
     std::fprintf(stderr, "\n=== Step 7: Telemetry Consumer ===\n");
     TelemetryConsumer consumer;
     ConsumerConfig consumer_config{};
@@ -191,9 +170,7 @@ int main(int argc, char* argv[]) {
         consumer.run(ring);
     });
 
-    // =========================================================================
     // Step 8: RUN THE BENCHMARK
-    // =========================================================================
     std::fprintf(stderr, "\n=== Step 8: BENCHMARK (%d seconds) ===\n", duration_secs);
     const auto start = std::chrono::steady_clock::now();
     const auto deadline = start + std::chrono::seconds(duration_secs);
@@ -202,9 +179,7 @@ int main(int argc, char* argv[]) {
         engine->run_batch(fleet, ring);
     }
 
-    // =========================================================================
     // Step 9: Shutdown and collect results
-    // =========================================================================
     std::fprintf(stderr, "\n=== Step 9: Shutdown ===\n");
     const auto end = std::chrono::steady_clock::now();
     const double elapsed_secs = std::chrono::duration<double>(end - start).count();
@@ -235,9 +210,7 @@ int main(int argc, char* argv[]) {
         waitpid(exchange_pid, &status, 0);
     }
 
-    // =========================================================================
     // Step 10: Validate results
-    // =========================================================================
     // Ground truth: compare engine sends vs receives
     const uint64_t actual_drops = engine->total_sends() - engine->total_recvs();
     result.total_samples = consumer.total_samples();

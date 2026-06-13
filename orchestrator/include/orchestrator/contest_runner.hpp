@@ -1,8 +1,6 @@
 #pragma once
-// =============================================================================
 // contest_runner.hpp — Full End-to-End Match Orchestrator
-// =============================================================================
-// The top-level component that ties EVERYTHING together:
+// Orchestrates the full contest pipeline:
 //
 //   1. Compile contestant code → static binary
 //   2. Inject binary into Firecracker rootfs
@@ -19,7 +17,6 @@
 //     throughput_score  = orders_processed / orders_sent
 //     latency_score     = 1000.0 / p99_latency_us
 //     PnL_weight        = 1.0 (PnL is PRIMARY metric)
-// =============================================================================
 
 #include "loadgen/order_blaster.hpp"
 #include "exchange/shadow_orderbook.hpp"
@@ -41,9 +38,7 @@
 
 namespace iicpc {
 
-// =============================================================================
 // Match Configuration
-// =============================================================================
 struct MatchConfig {
     // Contestant
     const char* contestant_id    = "unknown";
@@ -73,9 +68,7 @@ struct MatchConfig {
     bool use_docker_compile      = false;
 };
 
-// =============================================================================
 // Match Result
-// =============================================================================
 struct MatchResult {
     // Identity
     char contestant_id[64] = {};
@@ -107,27 +100,21 @@ struct MatchResult {
 
     void print() const noexcept {
         std::fprintf(stderr, "\n");
-        std::fprintf(stderr, "╔══════════════════════════════════════════════════════════════╗\n");
-        std::fprintf(stderr, "║                    MATCH RESULT: %-25s  ║\n", contestant_id);
-        std::fprintf(stderr, "╠══════════════════════════════════════════════════════════════╣\n");
-        std::fprintf(stderr, "║  Compiled:      %s (%.2fs)                                 ║\n",
+        std::fprintf(stderr, "--- MATCH RESULT: %-25s ---\n", contestant_id);
+        std::fprintf(stderr, "--- Compiled:      %s (%.2fs) ---\n",
                      compiled ? "YES" : "NO ", compile_time_secs);
-        std::fprintf(stderr, "║  Orders Sent:   %-44lu  ║\n", orders_sent);
-        std::fprintf(stderr, "║  Responses:     %-44lu  ║\n", responses_recv);
-        std::fprintf(stderr, "║  Drops:         %-44lu  ║\n", drops);
-        std::fprintf(stderr, "║  Throughput:    %-40.0f OPS  ║\n", throughput);
-        std::fprintf(stderr, "║  p50 Latency:   %-40lu ns   ║\n", p50_ns);
-        std::fprintf(stderr, "║  p99 Latency:   %-40lu ns   ║\n", p99_ns);
-        std::fprintf(stderr, "║  Correctness:   %-40.4f      ║\n", correctness);
-        std::fprintf(stderr, "╠══════════════════════════════════════════════════════════════╣\n");
-        std::fprintf(stderr, "║  ★ FINAL SCORE: %-43.2f  ║\n", score);
-        std::fprintf(stderr, "╚══════════════════════════════════════════════════════════════╝\n");
+        std::fprintf(stderr, "--- Orders Sent:   %-44lu ---\n", orders_sent);
+        std::fprintf(stderr, "--- Responses:     %-44lu ---\n", responses_recv);
+        std::fprintf(stderr, "--- Drops:         %-44lu ---\n", drops);
+        std::fprintf(stderr, "--- Throughput:    %-40.0f OPS ---\n", throughput);
+        std::fprintf(stderr, "--- p50 Latency:   %-40lu ns ---\n", p50_ns);
+        std::fprintf(stderr, "--- p99 Latency:   %-40lu ns ---\n", p99_ns);
+        std::fprintf(stderr, "--- Correctness:   %-40.4f ---\n", correctness);
+        std::fprintf(stderr, "--- ★ FINAL SCORE: %-43.2f ---\n", score);
     }
 };
 
-// =============================================================================
 // Contest Runner
-// =============================================================================
 class ContestRunner {
 public:
     ContestRunner() noexcept = default;
@@ -140,9 +127,7 @@ public:
         std::fprintf(stderr, "\n[runner] === Starting match for '%s' ===\n",
                      cfg.contestant_id);
 
-        // =====================================================================
         // 1. Compile (or use pre-built binary)
-        // =====================================================================
         const char* binary_path = nullptr;
 
         if (cfg.prebuilt_binary) {
@@ -173,9 +158,7 @@ public:
             binary_path = cc.output_path;
         }
 
-        // =====================================================================
         // 2. Initialize arena + components
-        // =====================================================================
         std::fprintf(stderr, "[runner] [2/6] Initializing arena + components...\n");
 
         HugePageArena arena;
@@ -203,9 +186,7 @@ public:
             return result;
         }
 
-        // =====================================================================
         // 3. Boot VM / Start process + CPU Pinning
-        // =====================================================================
         std::fprintf(stderr, "[runner] [3/6] Starting contestant process...\n");
 
         // Pin the blaster/orchestrator thread to isolated core
@@ -316,9 +297,7 @@ public:
             return result;
         }
 
-        // =====================================================================
         // 4. Blast orders
-        // =====================================================================
         std::fprintf(stderr, "[runner] [4/6] Blasting orders for %us...\n",
                      cfg.duration_secs);
 
@@ -392,9 +371,7 @@ public:
             }
         }
 
-        // =====================================================================
         // 5. Stop + collect
-        // =====================================================================
         std::fprintf(stderr, "[runner] [5/6] Stopping and collecting results...\n");
 
         // Send SessionEnd to contestant
@@ -430,9 +407,7 @@ public:
 
         shadow.finalize();
 
-        // =====================================================================
         // 6. Score
-        // =====================================================================
         std::fprintf(stderr, "[runner] [6/6] Computing score...\n");
 
         auto& bs = bridge.stats();
@@ -488,9 +463,7 @@ public:
         return result;
     }
 
-    // =========================================================================
     // Run post-contest system tests against a pre-built binary
-    // =========================================================================
     SystemTestResult run_system_tests(const MatchConfig& cfg,
                                        double original_score) noexcept {
         const char* binary_path = cfg.prebuilt_binary;

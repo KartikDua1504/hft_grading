@@ -1,10 +1,7 @@
 #pragma once
-// =============================================================================
 // payload_gen.hpp — Compile-Time Payload Template Generation
-// =============================================================================
 // Pre-generates all bot payloads into arena memory during initialization.
 // On the hot path, we only memcpy a sequence number into a fixed offset.
-// =============================================================================
 
 #include "core/arena.hpp"
 #include "core/types.hpp"
@@ -70,7 +67,7 @@ inline bool generate_payloads(HugePageArena& arena, BotFleet& fleet) noexcept {
 }
 
 /// Hot-path: patch sequence number and TSC into an existing payload.
-/// This is the ONLY mutation on the hot path — two memcpy's into known offsets.
+/// Hot-path mutation: two memcpy — two memcpy's into known offsets.
 inline void patch_payload(const uint8_t* payload, uint32_t seq_num, uint64_t tsc) noexcept {
     auto* msg = const_cast<BenchmarkMessage*>(reinterpret_cast<const BenchmarkMessage*>(payload));
     msg->seq_num = seq_num;

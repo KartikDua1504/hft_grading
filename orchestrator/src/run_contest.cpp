@@ -1,6 +1,4 @@
-// =============================================================================
 // run_contest.cpp — Standalone Contest Runner
-// =============================================================================
 // Usage:
 //   ./run_contest --source /path/to/contestant.cpp [options]
 //   ./run_contest --system-test --binary /path/to/binary [options]
@@ -17,7 +15,6 @@
 //   --system-test      Run post-contest system tests (requires --binary)
 //   --original-score S Contest score to blend with (default: 1.0)
 //   --scenarios all    Run all stress scenarios (default)
-// =============================================================================
 
 #include "orchestrator/contest_runner.hpp"
 
@@ -111,9 +108,7 @@ int main(int argc, char* argv[]) {
         cfg.prebuilt_binary = binary_path;
     }
 
-    // =========================================================================
     // System Test Mode
-    // =========================================================================
     if (system_test_mode) {
         if (!binary_path) {
             std::fprintf(stderr, "ERROR: --system-test requires --binary\n");
@@ -121,10 +116,8 @@ int main(int argc, char* argv[]) {
         }
 
         std::fprintf(stderr, "\n");
-        std::fprintf(stderr, "╔══════════════════════════════════════════════════════════╗\n");
-        std::fprintf(stderr, "║   IICPC System Test Runner (Post-Contest)               ║\n");
-        std::fprintf(stderr, "║   Binary → Stress Scenarios → Validate → Final Score    ║\n");
-        std::fprintf(stderr, "╚══════════════════════════════════════════════════════════╝\n");
+        std::fprintf(stderr, "--- IICPC System Test Runner (Post-Contest) ---\n");
+        std::fprintf(stderr, "--- Binary → Stress Scenarios → Validate → Final Score ---\n");
         std::fprintf(stderr, "\n");
         std::fprintf(stderr, "  Contestant:      %s\n", cfg.contestant_id);
         std::fprintf(stderr, "  Binary:          %s\n", binary_path);
@@ -142,19 +135,15 @@ int main(int argc, char* argv[]) {
         return (result.scenarios_passed == result.scenarios_total) ? 0 : 1;
     }
 
-    // =========================================================================
     // Normal Contest Mode
-    // =========================================================================
     if (!cfg.source_path && !binary_path) {
         std::fprintf(stderr, "ERROR: --source or --binary required\n");
         return 1;
     }
 
     std::fprintf(stderr, "\n");
-    std::fprintf(stderr, "╔══════════════════════════════════════════════════════════╗\n");
-    std::fprintf(stderr, "║   IICPC Contest Runner                                  ║\n");
-    std::fprintf(stderr, "║   Compile → Boot → Blast → Validate → Score             ║\n");
-    std::fprintf(stderr, "╚══════════════════════════════════════════════════════════╝\n");
+    std::fprintf(stderr, "--- IICPC Contest Runner ---\n");
+    std::fprintf(stderr, "--- Compile → Boot → Blast → Validate → Score ---\n");
     std::fprintf(stderr, "\n");
     std::fprintf(stderr, "  Contestant:   %s\n", cfg.contestant_id);
     if (cfg.source_path)

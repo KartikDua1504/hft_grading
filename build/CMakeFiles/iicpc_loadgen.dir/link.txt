@@ -1,2 +1,0 @@
-/usr/bin/ar qc libiicpc_loadgen.a CMakeFiles/iicpc_loadgen.dir/loadgen/src/bot_fleet.cpp.o CMakeFiles/iicpc_loadgen.dir/loadgen/src/payload_gen.cpp.o CMakeFiles/iicpc_loadgen.dir/loadgen/src/io_engine.cpp.o
-/usr/bin/ranlib libiicpc_loadgen.a

@@ -1,7 +1,5 @@
 #pragma once
-// =============================================================================
 // stress_scenarios.hpp — Adversarial Stress Test Scenario Library
-// =============================================================================
 // CF-style "system tests" — 10 deterministic scenarios that probe edge cases
 // in contestant orderbook implementations. Each scenario uses a fixed seed
 // and specific OrderBlasterConfig overrides to generate reproducible,
@@ -18,7 +16,6 @@
 //   8. Duplicate Order IDs   — Rapidly reusing client_order_id space
 //   9. Position Limit Grind  — Orders exactly at position limits
 //  10. Conservation Audit    — Balanced buy/sell, verify qty conservation
-// =============================================================================
 
 #include "loadgen/order_blaster.hpp"
 
@@ -27,9 +24,7 @@
 
 namespace iicpc {
 
-// =============================================================================
 // Scenario Definition
-// =============================================================================
 inline constexpr uint32_t MAX_STRESS_SCENARIOS = 10;
 
 struct StressScenario {
@@ -41,9 +36,7 @@ struct StressScenario {
     OrderBlasterConfig blaster_cfg;     // Overridden blaster config
 };
 
-// =============================================================================
 // Per-scenario result
-// =============================================================================
 struct ScenarioResult {
     uint32_t scenario_id      = 0;
     char     name[48]         = {};
@@ -59,17 +52,13 @@ struct ScenarioResult {
     uint64_t priority_errors  = 0;
 };
 
-// =============================================================================
 // Build the 10 stress scenarios
-// =============================================================================
 inline uint32_t build_stress_scenarios(StressScenario* out) noexcept {
     uint32_t count = 0;
 
-    // =====================================================================
     // Scenario 1: Crossed Book Stress
     // Orders alternate BUY/SELL at overlapping prices. Tests that the
     // contestant correctly matches crosses instead of letting them rest.
-    // =====================================================================
     {
         auto& s = out[count++];
         s.id = 1;
@@ -92,11 +81,9 @@ inline uint32_t build_stress_scenarios(StressScenario* out) noexcept {
         s.blaster_cfg.orders_per_batch = 256;
     }
 
-    // =====================================================================
     // Scenario 2: Deep Book Sweep
     // Builds a deep book with many price levels, then sends large market
     // orders that sweep through hundreds of levels.
-    // =====================================================================
     {
         auto& s = out[count++];
         s.id = 2;
@@ -119,11 +106,9 @@ inline uint32_t build_stress_scenarios(StressScenario* out) noexcept {
         s.blaster_cfg.orders_per_batch = 128;
     }
 
-    // =====================================================================
     // Scenario 3: Cancel Storm
     // 90% cancel rate. Tests that cancel handling doesn't corrupt the book
     // state, and that cancelled orders are properly removed.
-    // =====================================================================
     {
         auto& s = out[count++];
         s.id = 3;
@@ -146,11 +131,9 @@ inline uint32_t build_stress_scenarios(StressScenario* out) noexcept {
         s.blaster_cfg.orders_per_batch = 256;
     }
 
-    // =====================================================================
     // Scenario 4: Self-Trade Trap
     // Tight spread, high volume near position limits. Forces contestants to
     // handle near-limit positions where orders nearly self-trade.
-    // =====================================================================
     {
         auto& s = out[count++];
         s.id = 4;
@@ -173,11 +156,9 @@ inline uint32_t build_stress_scenarios(StressScenario* out) noexcept {
         s.blaster_cfg.orders_per_batch = 64;
     }
 
-    // =====================================================================
     // Scenario 5: Tick-Size Edge
     // Orders at min price (1 tick), max price (near INT64_MAX/2),
     // and exactly on tick boundaries. Tests boundary handling.
-    // =====================================================================
     {
         auto& s = out[count++];
         s.id = 5;
@@ -200,11 +181,9 @@ inline uint32_t build_stress_scenarios(StressScenario* out) noexcept {
         s.blaster_cfg.orders_per_batch = 128;
     }
 
-    // =====================================================================
     // Scenario 6: Burst Traffic
     // Short duration but extreme batch size. Tests throughput ceiling
     // and backpressure handling under spike conditions.
-    // =====================================================================
     {
         auto& s = out[count++];
         s.id = 6;
@@ -227,12 +206,10 @@ inline uint32_t build_stress_scenarios(StressScenario* out) noexcept {
         s.blaster_cfg.orders_per_batch = 512;   // Very high batch size
     }
 
-    // =====================================================================
     // Scenario 7: IOC Flood
     // 100% IOC/Market orders — nothing should rest in the book.
     // Tests that the book stays empty and all unfilled IOCs are properly
     // rejected or cancelled.
-    // =====================================================================
     {
         auto& s = out[count++];
         s.id = 7;
@@ -255,11 +232,9 @@ inline uint32_t build_stress_scenarios(StressScenario* out) noexcept {
         s.blaster_cfg.orders_per_batch = 128;
     }
 
-    // =====================================================================
     // Scenario 8: Rapid Order ID Churn
     // High volume with small order_id space. Tests that contestant
     // handles order_id recycling and doesn't confuse old/new IDs.
-    // =====================================================================
     {
         auto& s = out[count++];
         s.id = 8;
@@ -282,11 +257,9 @@ inline uint32_t build_stress_scenarios(StressScenario* out) noexcept {
         s.blaster_cfg.orders_per_batch = 256;
     }
 
-    // =====================================================================
     // Scenario 9: Position Limit Grind
     // Alternating large BUY then large SELL to push position to the edge.
     // Tests that fills near the limit are correctly handled.
-    // =====================================================================
     {
         auto& s = out[count++];
         s.id = 9;
@@ -309,11 +282,9 @@ inline uint32_t build_stress_scenarios(StressScenario* out) noexcept {
         s.blaster_cfg.orders_per_batch = 64;
     }
 
-    // =====================================================================
     // Scenario 10: Conservation Audit
     // Balanced 50/50 buy/sell, moderate volume. After all fills,
     // total buy qty MUST equal total sell qty (conservation invariant).
-    // =====================================================================
     {
         auto& s = out[count++];
         s.id = 10;

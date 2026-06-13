@@ -1,1 +1,0 @@
-/usr/bin/c++ -O3 -DNDEBUG -flto=auto -Wl,--dependency-file=CMakeFiles/validate_checkpoint1.dir/link.d CMakeFiles/validate_checkpoint1.dir/bench/validate_checkpoint1.cpp.o -o validate_checkpoint1  libiicpc_core.a libiicpc_loadgen.a libiicpc_telemetry.a libiicpc_core.a -lpthread

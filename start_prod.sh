@@ -1,22 +1,14 @@
 #!/usr/bin/env bash
-# =============================================================================
 # IICPC Arena — Production Launcher
-# =============================================================================
-# Builds frontend, then runs everything with proper process management.
+# Builds frontend and starts all services with process management.
 # Usage:  bash start_prod.sh
-# =============================================================================
 set -e
 
 PROJECT_ROOT="$(cd "$(dirname "$0")" && pwd)"
 cd "$PROJECT_ROOT"
 
-echo ""
-echo "╔══════════════════════════════════════════════════════════╗"
-echo "║                                                        ║"
-echo "║     ⚡  IICPC ARENA — Production Launcher  ⚡         ║"
-echo "║                                                        ║"
-echo "╚══════════════════════════════════════════════════════════╝"
-echo ""
+echo "--- IICPC Arena: Production Launcher ---"
+
 
 # Cleanup on exit
 cleanup() {
@@ -39,7 +31,6 @@ else
 fi
 
 # ━━━ [2/5] C++ Engine ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-echo ""
 echo "━━━ [2/5] C++ Engine ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 if [ -f "build/run_contest" ]; then
     echo "[✓] Engine binary found: build/run_contest"
@@ -51,7 +42,6 @@ else
 fi
 
 # ━━━ [3/5] Frontend Build ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-echo ""
 echo "━━━ [3/5] Frontend Build ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 cd web/frontend
 if [ ! -d "node_modules" ]; then
@@ -63,7 +53,6 @@ echo "[✓] Frontend built to build/"
 cd "$PROJECT_ROOT"
 
 # ━━━ [4/5] FastAPI Backend ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-echo ""
 echo "━━━ [4/5] FastAPI Backend ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 cd web/backend
 pip install -q fastapi uvicorn python-multipart aiofiles redis pyjwt 2>/dev/null
@@ -79,7 +68,6 @@ else
 fi
 
 # ━━━ [5/5] SvelteKit Node Server ━━━━━━━━━━━━━━━━━━━━━━━━
-echo ""
 echo "━━━ [5/5] SvelteKit Node Server ━━━━━━━━━━━━━━━━━━━━━━━━"
 cd web/frontend
 echo "[*] Starting SvelteKit on :3000..."
@@ -88,25 +76,16 @@ FRONTEND_PID=$!
 cd "$PROJECT_ROOT"
 sleep 1
 
-echo ""
-echo "╔══════════════════════════════════════════════════════════╗"
-echo "║                                                        ║"
-echo "║  ✅  IICPC Arena — PRODUCTION MODE                     ║"
-echo "║                                                        ║"
-echo "║  Frontend:    http://localhost:3000                     ║"
-echo "║  Backend API: http://localhost:8000/api/health          ║"
-echo "║  Admin Panel: http://localhost:3000/admin               ║"
-echo "║                                                        ║"
-echo "║  For Nginx: sudo cp infra/nginx/iicpc.conf             ║"
-echo "║             /etc/nginx/sites-enabled/                   ║"
-echo "║  Then:      sudo nginx -t && sudo systemctl reload nginx║"
-echo "║                                                        ║"
-echo "║  Admin password: \$ADMIN_PASSWORD (default: iicpc-admin-2026)"
-echo "║                                                        ║"
-echo "║  Press Ctrl+C to stop everything                       ║"
-echo "║                                                        ║"
-echo "╚══════════════════════════════════════════════════════════╝"
-echo ""
+echo "--- IICPC Arena: Production Launcher ---"
+echo "  IICPC Arena: Production Mode"
+echo "  Frontend:    http://localhost:3000                     "
+echo "  Backend API: http://localhost:8000/api/health          "
+echo "  Admin Panel: http://localhost:3000/admin               "
+echo "  For Nginx: sudo cp infra/nginx/iicpc.conf             "
+echo "             /etc/nginx/sites-enabled/                   "
+echo "  Then:      sudo nginx -t && sudo systemctl reload nginx"
+echo "  Admin password: \$ADMIN_PASSWORD (default: iicpc-admin-2026)"
+echo "    Press Ctrl+C to stop all services."
 
 # Wait for signals
 wait

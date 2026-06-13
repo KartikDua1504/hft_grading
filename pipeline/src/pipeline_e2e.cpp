@@ -1,13 +1,10 @@
-// =============================================================================
 // pipeline_e2e.cpp — End-to-End Pipeline Test
-// =============================================================================
 // Runs a short SHM benchmark and publishes results to:
 //   - QuestDB (ILP on port 9009) — time-series latency data
 //   - Redis (RESP on port 16379) — leaderboard sorted set
 //
 // This validates the full data flow:
 //   Engine → Telemetry → QuestDB + Redis
-// =============================================================================
 
 #include "core/arena.hpp"
 #include "core/ring_buffer.hpp"
@@ -78,14 +75,10 @@ int main(int argc, char* argv[]) {
     ::signal(SIGPIPE, SIG_IGN);
 
     std::fprintf(stderr, "\n");
-    std::fprintf(stderr, "╔══════════════════════════════════════════════════════════╗\n");
-    std::fprintf(stderr, "║   IICPC END-TO-END PIPELINE TEST                        ║\n");
-    std::fprintf(stderr, "║   Engine → Telemetry → QuestDB + Redis                  ║\n");
-    std::fprintf(stderr, "╚══════════════════════════════════════════════════════════╝\n\n");
+    std::fprintf(stderr, "--- IICPC END-TO-END PIPELINE TEST ---\n");
+    std::fprintf(stderr, "--- Engine → Telemetry → QuestDB + Redis ---\n");
 
-    // =========================================================================
     // Step 1: Connect to QuestDB and Redis
-    // =========================================================================
     QuestDBPublisher questdb;
     bool questdb_ok = questdb.connect(cfg.questdb_host, cfg.questdb_port);
     if (!questdb_ok) {
@@ -98,9 +91,7 @@ int main(int argc, char* argv[]) {
         std::fprintf(stderr, "[pipeline] WARNING: Redis not available, skipping leaderboard\n");
     }
 
-    // =========================================================================
     // Step 2: Run SHM benchmark
-    // =========================================================================
     HugePageArena arena;
     (void)arena.init(512ULL * 1024 * 1024);
     auto tsc_cal = calibrate_tsc();
@@ -152,9 +143,7 @@ int main(int argc, char* argv[]) {
 
     std::thread consumer_thread([&]() { consumer.run(ring); });
 
-    // =========================================================================
     // Step 3: Run benchmark + publish metrics every second
-    // =========================================================================
     std::fprintf(stderr, "[pipeline] Running %d-second benchmark with %zu bots...\n\n",
                  cfg.duration_secs, cfg.num_bots);
 
@@ -217,9 +206,7 @@ int main(int argc, char* argv[]) {
         }
     }
 
-    // =========================================================================
     // Step 4: Drain + Shutdown
-    // =========================================================================
     const auto end = std::chrono::steady_clock::now();
     const double elapsed_secs = std::chrono::duration<double>(end - start).count();
 
@@ -236,9 +223,7 @@ int main(int argc, char* argv[]) {
     exchange_stop.store(true);
     if (exchange_thread.joinable()) exchange_thread.join();
 
-    // =========================================================================
     // Step 5: Final results + publish
-    // =========================================================================
     const uint64_t sends = engine.total_sends();
     const uint64_t recvs = engine.total_recvs();
     const double tps = static_cast<double>(recvs) / elapsed_secs;
@@ -263,22 +248,18 @@ int main(int argc, char* argv[]) {
     }
 
     std::fprintf(stderr, "\n");
-    std::fprintf(stderr, "╔══════════════════════════════════════════════════════════════╗\n");
-    std::fprintf(stderr, "║             PIPELINE E2E RESULTS                            ║\n");
-    std::fprintf(stderr, "╠══════════════════════════════════════════════════════════════╣\n");
-    std::fprintf(stderr, "║  Duration:     %.2f seconds                                ║\n", elapsed_secs);
-    std::fprintf(stderr, "║  TPS:          %-44.0f  ║\n", tps);
-    std::fprintf(stderr, "║  Drops:        %-44lu  ║\n", drops);
-    std::fprintf(stderr, "║  p50:          %10.2f µs                                   ║\n",
+    std::fprintf(stderr, "--- PIPELINE E2E RESULTS ---\n");
+    std::fprintf(stderr, "--- Duration:     %.2f seconds ---\n", elapsed_secs);
+    std::fprintf(stderr, "--- TPS:          %-44.0f ---\n", tps);
+    std::fprintf(stderr, "--- Drops:        %-44lu ---\n", drops);
+    std::fprintf(stderr, "--- p50:          %10.2f µs ---\n",
                  static_cast<double>(pct.p50) / 1000.0);
-    std::fprintf(stderr, "║  p99:          %10.2f µs                                   ║\n",
+    std::fprintf(stderr, "--- p99:          %10.2f µs ---\n",
                  static_cast<double>(pct.p99) / 1000.0);
-    std::fprintf(stderr, "║                                                              ║\n");
-    std::fprintf(stderr, "║  [%s] QuestDB publish (%lu points)                        ║\n",
+    std::fprintf(stderr, "--- [%s] QuestDB publish (%lu points) ---\n",
                  questdb_ok ? "✓" : "✗", questdb.total_published());
-    std::fprintf(stderr, "║  [%s] Redis leaderboard                                    ║\n",
+    std::fprintf(stderr, "--- [%s] Redis leaderboard ---\n",
                  redis_ok ? "✓" : "✗");
-    std::fprintf(stderr, "╚══════════════════════════════════════════════════════════════╝\n");
 
     return 0;
 }

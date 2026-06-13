@@ -1,6 +1,5 @@
-// =============================================================================
-// hdr_histogram.cpp — HDR Histogram Implementation
-// =============================================================================
+// --- HDR Histogram Implementation ---
+
 #include "core/hdr_histogram.hpp"
 #include <cmath>
 #include <algorithm>
@@ -118,7 +117,7 @@ std::size_t HdrHistogram::value_to_index(uint64_t value) const noexcept {
         return static_cast<std::size_t>(value >> unit_magnitude_);
     }
 
-    // Find the bucket level via leading zeros
+    // Find bucket level via leading zeros
     const int leading = __builtin_clzll(static_cast<unsigned long long>(value));
     const int bucket_idx = 63 - leading - sub_bucket_half_count_magnitude_ - unit_magnitude_;
     const int sub_idx = static_cast<int>(value >> (bucket_idx + unit_magnitude_))

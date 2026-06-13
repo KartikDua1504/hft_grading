@@ -1,12 +1,9 @@
 #!/bin/bash
-# =============================================================================
 # pre_submit.sh — Pre-Submission Validation
-# =============================================================================
 # Runs ALL checks locally to ensure the project is submission-ready.
 # Exit code 0 = safe to submit. Non-zero = fix issues first.
 #
 # Usage: ./scripts/pre_submit.sh
-# =============================================================================
 
 set -euo pipefail
 
@@ -29,14 +26,10 @@ pass() { echo -e "  ${GREEN}✓${NC} $*"; PASS=$((PASS+1)); }
 fail() { echo -e "  ${RED}✗${NC} $*"; FAIL=$((FAIL+1)); }
 warn() { echo -e "  ${YELLOW}!${NC} $*"; WARN=$((WARN+1)); }
 
-echo -e "${BOLD}╔═══════════════════════════════════════════════════════╗${NC}"
-echo -e "${BOLD}║     IICPC Pre-Submission Validation Suite             ║${NC}"
-echo -e "${BOLD}╚═══════════════════════════════════════════════════════╝${NC}"
+echo -e "${BOLD}--- IICPC Pre-Submission Validation Suite ---${NC}"
 echo ""
 
-# =============================================================================
 # 1. Project structure
-# =============================================================================
 echo -e "${CYAN}[1/7] Project Structure${NC}"
 
 for f in CMakeLists.txt README.md; do
@@ -57,9 +50,7 @@ for f in tb_sequencer.sv tb_match_engine.sv; do
     [ -f "$PROJECT_ROOT/fpga/sim/$f" ] && pass "fpga/sim/$f" || fail "fpga/sim/$f missing"
 done
 
-# =============================================================================
 # 2. C++ Build
-# =============================================================================
 echo ""
 echo -e "${CYAN}[2/7] C++ Build${NC}"
 
@@ -96,9 +87,7 @@ for bin in worker_agent integrated_worker bench_ultra; do
     fi
 done
 
-# =============================================================================
 # 3. Header compilation (new components)
-# =============================================================================
 echo ""
 echo -e "${CYAN}[3/7] New Component Headers${NC}"
 
@@ -113,9 +102,7 @@ for header in sequencer.hpp audit_log.hpp correctness_validator.hpp; do
     fi
 done
 
-# =============================================================================
 # 4. FPGA Simulation (if Verilator installed)
-# =============================================================================
 echo ""
 echo -e "${CYAN}[4/7] FPGA Simulation${NC}"
 
@@ -153,9 +140,7 @@ else
     warn "Verilator not installed — skipping FPGA simulation"
 fi
 
-# =============================================================================
 # 5. Infrastructure files
-# =============================================================================
 echo ""
 echo -e "${CYAN}[5/7] Infrastructure${NC}"
 
@@ -189,9 +174,7 @@ else
     warn "docker-compose.yml not found"
 fi
 
-# =============================================================================
 # 6. Scripts
-# =============================================================================
 echo ""
 echo -e "${CYAN}[6/7] Scripts${NC}"
 
@@ -211,9 +194,7 @@ done
 [ -f "$PROJECT_ROOT/fpga/Makefile" ] && pass "fpga/Makefile" || fail "fpga/Makefile missing"
 [ -f "$PROJECT_ROOT/fpga/aws/build_afi.sh" ] && pass "fpga/aws/build_afi.sh" || fail "fpga/aws/build_afi.sh missing"
 
-# =============================================================================
 # 7. Documentation
-# =============================================================================
 echo ""
 echo -e "${CYAN}[7/7] Documentation${NC}"
 
@@ -230,9 +211,7 @@ if [ -f "$PROJECT_ROOT/README.md" ]; then
     done
 fi
 
-# =============================================================================
 # Summary
-# =============================================================================
 echo ""
 echo -e "${BOLD}═══════════════════════════════════════════════════════${NC}"
 echo -e "  ${GREEN}PASS${NC}: $PASS   ${RED}FAIL${NC}: $FAIL   ${YELLOW}WARN${NC}: $WARN"

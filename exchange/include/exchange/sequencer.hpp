@@ -1,21 +1,12 @@
 #pragma once
-// =============================================================================
-// sequencer.hpp — Deterministic Order Sequencer
-// =============================================================================
+
+// --- Deterministic Order Sequencer ---
 // Assigns strictly monotonic sequence numbers to all incoming orders.
-// This is THE fairness and determinism guarantee:
-//   - All gateways call stamp() concurrently
-//   - Each order gets a unique, monotonically increasing seq_no
-//   - The match engine drains the ring in seq_no order
-//   - Same sequence → same fills, always. Deterministic replay.
+// Guarantees fairness and deterministic replay:
+//   Same sequence → same fills, always.
 //
-// Two modes:
-//   1. Software (default): lock-free atomic<uint64_t> counter
-//   2. FPGA (future): PCIe MMIO to hardware sequencer
-//
-// Architecture:
-//   Gateway threads → stamp() → MPSC ring → drain() → MatchEngine (single thread)
-// =============================================================================
+// Architecture: Gateway threads → stamp() → MPSC ring → drain() → MatchEngine
+// Software mode: lock-free atomic<uint64_t> counter.
 
 #include "sdk/protocol.hpp"
 #include "core/arena.hpp"
@@ -29,13 +20,11 @@
 
 namespace iicpc {
 
-// =============================================================================
-// Sequenced order — what the match engine actually processes
-// =============================================================================
+// --- Sequenced Order (what the match engine processes) ---
 struct alignas(64) SequencedOrder {
     uint64_t    sequence_no;        // Global monotonic sequence number
-    uint64_t    recv_tsc;           // TSC timestamp when gateway received order
-    uint32_t    contestant_id;      // Which contestant submitted this
+    uint64_t    recv_tsc;           // TSC when gateway received order
+    uint32_t    contestant_id;
     MsgType     msg_type;           // ORDER_ENTRY or CANCEL_REQUEST
     uint8_t     _pad[3];
     union {
@@ -46,41 +35,31 @@ struct alignas(64) SequencedOrder {
 static_assert(sizeof(SequencedOrder) == 128 || sizeof(SequencedOrder) == 192,
               "SequencedOrder should be cache-line aligned");
 
-// =============================================================================
-// Sequencer Configuration
-// =============================================================================
+// --- Sequencer Config ---
 struct SequencerConfig {
     uint32_t ring_size = 65536;     // Must be power of 2
-    bool     enable_tsc = true;     // Stamp with rdtsc
+    bool     enable_tsc = true;
 };
 
-// =============================================================================
-// Lock-Free MPSC Sequencer (Multi-Producer Single-Consumer)
-// =============================================================================
+// --- Lock-Free MPSC Sequencer ---
 // Producers (gateways) call stamp() concurrently.
 // Consumer (match engine) calls drain() on a single thread.
-// =============================================================================
-inline constexpr uint32_t SEQ_RING_SIZE = 65536; // 64K slots
+inline constexpr uint32_t SEQ_RING_SIZE = 65536;
 inline constexpr uint32_t SEQ_RING_MASK = SEQ_RING_SIZE - 1;
 
 class OrderSequencer {
 public:
     OrderSequencer() noexcept = default;
 
-    // =========================================================================
-    // Initialize: allocate ring from arena
-    // =========================================================================
+    // --- Initialize: allocate ring from arena ---
     bool init(HugePageArena& arena) noexcept {
         ring_ = static_cast<SequencedOrder*>(
-            arena.allocate_raw(sizeof(SequencedOrder) * SEQ_RING_SIZE,
-                               64)); // cache-line aligned
+            arena.allocate_raw(sizeof(SequencedOrder) * SEQ_RING_SIZE, 64));
         if (!ring_) return false;
 
-        // Zero-init all slots
         std::memset(ring_, 0, sizeof(SequencedOrder) * SEQ_RING_SIZE);
 
-        // Committed flags: 0 = empty, 1 = ready to consume, 2 = being written
-        // Use raw allocation since std::atomic is not trivially constructible
+        // Committed flags: 0 = empty, 1 = ready, 2 = being written
         committed_ = static_cast<std::atomic<uint8_t>*>(
             arena.allocate_raw(sizeof(std::atomic<uint8_t>) * SEQ_RING_SIZE, 64));
         if (!committed_) return false;
@@ -99,28 +78,21 @@ public:
         return true;
     }
 
-    // =========================================================================
-    // stamp() — Called by gateway threads (CONCURRENT, lock-free)
-    // Assigns a sequence number and pushes to the ring.
-    // Returns the assigned sequence number, or 0 on failure (ring full).
-    // =========================================================================
+    // --- stamp() — concurrent, lock-free (called by gateways) ---
+    // Returns assigned sequence number, or 0 on ring-full drop.
     IICPC_HOT
     uint64_t stamp_order(uint32_t contestant_id,
                          const OrderEntry& order) noexcept {
-        // Atomically claim a sequence number
         uint64_t seq = seq_counter_.fetch_add(1, std::memory_order_acq_rel) + 1;
         uint32_t slot = static_cast<uint32_t>(seq) & SEQ_RING_MASK;
 
-        // Check if slot is free (previous consumer already drained it)
         uint8_t expected = 0;
         if (!committed_[slot].compare_exchange_strong(expected, 2,
                 std::memory_order_acquire, std::memory_order_relaxed)) {
-            // Ring is full — consumer hasn't caught up
             drops_.fetch_add(1, std::memory_order_relaxed);
             return 0;
         }
 
-        // Write the sequenced order into the slot
         SequencedOrder& so = ring_[slot];
         so.sequence_no = seq;
         so.recv_tsc = asm_hot::rdtsc_serialized();
@@ -128,7 +100,6 @@ public:
         so.msg_type = MsgType::ORDER_ENTRY;
         std::memcpy(&so.order, &order, sizeof(OrderEntry));
 
-        // Mark as committed (ready for consumer)
         committed_[slot].store(1, std::memory_order_release);
         total_stamped_.fetch_add(1, std::memory_order_relaxed);
 
@@ -160,23 +131,17 @@ public:
         return seq;
     }
 
-    // =========================================================================
-    // drain() — Called by match engine (SINGLE THREAD, sequential)
-    // Returns true if an order was available, fills `out`.
-    // =========================================================================
+    // --- drain() — single-thread consumer (match engine) ---
     IICPC_HOT
     bool drain(SequencedOrder& out) noexcept {
         uint32_t slot = static_cast<uint32_t>(drain_pos_ + 1) & SEQ_RING_MASK;
 
-        // Check if this slot has been committed
         if (committed_[slot].load(std::memory_order_acquire) != 1) {
-            return false; // Nothing to drain
+            return false;
         }
 
-        // Copy out
         std::memcpy(&out, &ring_[slot], sizeof(SequencedOrder));
 
-        // Mark slot as free for reuse
         committed_[slot].store(0, std::memory_order_release);
         drain_pos_++;
         total_drained_.fetch_add(1, std::memory_order_relaxed);
@@ -184,9 +149,7 @@ public:
         return true;
     }
 
-    // =========================================================================
-    // Batch drain — drain up to N orders at once (reduces overhead)
-    // =========================================================================
+    // --- Batch drain ---
     uint32_t drain_batch(SequencedOrder* out, uint32_t max_batch) noexcept {
         uint32_t count = 0;
         while (count < max_batch && drain(out[count])) {
@@ -195,9 +158,7 @@ public:
         return count;
     }
 
-    // =========================================================================
-    // Stats
-    // =========================================================================
+    // --- Stats ---
     [[nodiscard]] uint64_t total_stamped() const noexcept {
         return total_stamped_.load(std::memory_order_relaxed);
     }
@@ -229,7 +190,7 @@ private:
     alignas(64) std::atomic<uint64_t> total_stamped_{0};
     alignas(64) std::atomic<uint64_t> drops_{0};
 
-    // Consumer side (single thread, no contention)
+    // Consumer side (single thread)
     alignas(64) uint64_t drain_pos_ = 0;
     alignas(64) std::atomic<uint64_t> total_drained_{0};
 };
