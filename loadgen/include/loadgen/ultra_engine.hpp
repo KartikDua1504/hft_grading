@@ -40,7 +40,7 @@ struct UltraEngineConfig {
     static constexpr std::size_t EPOLL_MAX_EVENTS = 1024;
     static constexpr std::size_t PREFETCH_AHEAD = 8;
     static constexpr int BUSY_POLL_US = 50;        // SO_BUSY_POLL microseconds
-    static constexpr std::size_t SENDMMSG_BATCH = 64; // Messages per sendmmsg call
+    static constexpr std::size_t SENDMMSG_BATCH = 8; // Messages per sendmmsg call
 
     const char* target_host = "127.0.0.1";
     uint16_t target_port = 9999;
